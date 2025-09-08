@@ -1,0 +1,53 @@
+# Arquivo .gitignore para o projeto analise-despesas
+
+# 1. Artefatos e cache do Python
+# ---------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 2. Ambientes Virtuais
+# ---------------------------------
+# Padrão para venv, virtualenv, etc.
+.venv/
+venv/
+env/
+.env/
+
+# 3. Arquivos de dependências e builds
+# ---------------------------------
+*.egg-info/
+dist/
+build/
+
+# 4. Arquivos de configuração local e segredos
+# ---------------------------------
+# Nunca comitar arquivos .env que contêm senhas ou chaves de API
+.env
+*.env
+
+# 5. Arquivos gerados pelo projeto (Relatórios, Gráficos, etc.)
+# ---------------------------------
+*.csv
+*.xlsx
+*.png
+*.jpg
+*.pdf
+*.txt
+# Se você criar uma pasta para relatórios, pode adicionar a linha abaixo:
+# relatorios/
+
+# 6. Arquivos de IDEs e Editores
+# ---------------------------------
+.idea/          # Para PyCharm e outros JetBrains
+.vscode/        # Para Visual Studio Code (exceto arquivos de configuração compartilhada)
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# 7. Arquivos de Sistema Operacional
+# ---------------------------------
+.DS_Store       # macOS
+Thumbs.db       # Windows

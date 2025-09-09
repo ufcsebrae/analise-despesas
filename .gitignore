@@ -1,53 +1,41 @@
-# Arquivo .gitignore para o projeto analise-despesas
+# Arquivo para ignorar arquivos e pastas não essenciais no versionamento Git.
 
-# 1. Artefatos e cache do Python
-# ---------------------------------
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# 2. Ambientes Virtuais
-# ---------------------------------
-# Padrão para venv, virtualenv, etc.
+# 1. Ambientes Virtuais
+# Nunca versione suas dependências; elas devem ser instaladas via requirements.txt.
 .venv/
 venv/
 env/
-.env/
 
-# 3. Arquivos de dependências e builds
-# ---------------------------------
-*.egg-info/
-dist/
-build/
+# 2. Arquivos de Cache do Python
+# Gerados automaticamente pelo interpretador Python.
+__pycache__/
+*.pyc
 
-# 4. Arquivos de configuração local e segredos
-# ---------------------------------
-# Nunca comitar arquivos .env que contêm senhas ou chaves de API
+# 3. Segredos e Configurações de Ambiente
+# O arquivo .env contém senhas e nunca deve ser enviado ao repositório!
 .env
-*.env
 
-# 5. Arquivos gerados pelo projeto (Relatórios, Gráficos, etc.)
-# ---------------------------------
-*.csv
-*.xlsx
-*.png
-*.jpg
-*.pdf
-*.txt
-# Se você criar uma pasta para relatórios, pode adicionar a linha abaixo:
-# relatorios/
+# 4. Artefatos Gerados pela Aplicação
+# A pasta 'outputs' contém relatórios e gráficos gerados em cada execução.
+# O código-fonte deve ser capaz de gerá-los novamente.
+outputs/
 
-# 6. Arquivos de IDEs e Editores
-# ---------------------------------
-.idea/          # Para PyCharm e outros JetBrains
-.vscode/        # Para Visual Studio Code (exceto arquivos de configuração compartilhada)
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# 5. Logs
+# Arquivos de log são específicos de cada execução e não devem ser versionados.
+*.log
+logs/
 
-# 7. Arquivos de Sistema Operacional
-# ---------------------------------
-.DS_Store       # macOS
-Thumbs.db       # Windows
+# 6. Arquivos de Configuração de IDEs e Editores
+# Evita conflitos de configuração entre diferentes desenvolvedores.
+.vscode/
+.idea/
+
+# 7. Arquivos de Pacotes e Distribuição
+# Gerados se você decidir transformar seu projeto em um pacote instalável.
+build/
+dist/
+*.egg-info/
+
+# 8. Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db

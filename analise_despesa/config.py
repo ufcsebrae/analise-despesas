@@ -43,3 +43,12 @@ CONEXOES = {
         "trusted_connection": True
     }
 }
+MAPA_GESTORES = {
+    # Chave: Nome EXATO da Unidade, como aparece no resultado da query SQL.
+    # Valor: E-mail do gestor responsável.
+
+    "SP - Finanças e Controladoria": "cesargl@sebraesp.com.br", # Substitua pelo e-mail real
+    # "SP - Inovação": "gestor.inovacao@sebraesp.com.br",
+    # "SP - ER CAMPINAS": "gestor.campinas@sebraesp.com.br",
+    # "SP - Gestão de Soluções e Transformação Digital": "gestor.td@sebraesp.com.br"
+}

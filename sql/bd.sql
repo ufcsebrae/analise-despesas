@@ -64,15 +64,15 @@ BaseLancamentos AS (
 
 -- CTE para Centro de Custo permanece a mesma, mas com um JOIN mais limpo.
 CC AS (
-    SELECT
+   SELECT
         NivelAcao.CODCCUSTO,
-        NivelUnidade.NOME AS UNIDADE,
-        NivelProjeto.NOME AS PROJETO,
-        NivelAcao.NOME AS ACAO
+        NivelUnidade.CAMPOLIVRE AS ACAO,
+        NivelProjeto.CAMPOLIVRE AS PROJETO,
+        NivelAcao.CAMPOLIVRE AS UNIDADE
     FROM HUBDADOS.CorporeRM.GCCUSTO AS NivelAcao
     -- Corrigindo a lógica para buscar os níveis hierárquicos corretos
     LEFT JOIN HUBDADOS.CorporeRM.GCCUSTO AS NivelProjeto ON LEFT(NivelAcao.CODCCUSTO, 5) = NivelProjeto.CODCCUSTO
-    LEFT JOIN HUBDADOS.CorporeRM.GCCUSTO AS NivelUnidade ON LEFT(NivelAcao.CODCCUSTO, 2) = NivelUnidade.CODCCUSTO
+    LEFT JOIN HUBDADOS.CorporeRM.GCCUSTO AS NivelUnidade ON LEFT(NivelAcao.CODCCUSTO, 12) = NivelUnidade.CODCCUSTO
     WHERE 
         LEN(NivelAcao.CODCCUSTO) > 15 -- Filtra para o nível mais detalhado
 )
@@ -105,4 +105,5 @@ WHERE
     AND NOT ((bl.TIPO_DESPESA = 'Imobilizado') AND (bl.DEBITO LIKE '7.2.3.1.01%' OR bl.DEBITO LIKE '7.2.2.2.01%'))
     AND NOT (bl.TIPO_DESPESA = 'Investimentos' AND bl.IDRATEIO = '1929077')
     AND NOT (bl.TIPO_DESPESA = 'Encargos' AND bl.IDRATEIO IN ('1537384', '1911286'))
-    AND NOT (bl.TIPO_DESPESA = 'Custo' AND bl.IDRATEIO = '1537388');
+    AND NOT (bl.TIPO_DESPESA = 'Custo' AND bl.IDRATEIO = '1537388')
+    AND cc.UNIDADE = :unidade_gestora;

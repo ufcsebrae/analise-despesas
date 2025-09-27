@@ -1,109 +1,92 @@
 -- sql/bd.sql
-WITH 
--- 1. CTE unificada para buscar todos os lançamentos relevantes de uma só vez.
-BaseLancamentos AS (
-    SELECT
-        crt.IDRATEIO,
-        crt.LCTREF,
-        tmc.IDOPERACAO,
-        crt.IDPARTIDA,
-        tct.IDMOV,
-        tmv.CODTMV,
-        tmv.CODUSUARIO,
-        tmv.DATAEMISSAO,
-        cln.CREDITO,
-        cln.DEBITO,
-        cln.COMPLEMENTO,
-        cln.[DATA],
-        crt.VLRCREDITO,
-        crt.VLRDEBITO,
-        (crt.VLRDEBITO - crt.VLRCREDITO) AS UNIFICAVALOR,
-        crt.CODGERENCIAL,
-        tmv.CODCFO,
-        
-        -- 2. Classifica a despesa e determina a conta contábil usando CASE.
-        --    Isso substitui a necessidade de múltiplas CTEs e IIF.
-        CASE
-            WHEN (cln.DEBITO LIKE '3.1.1%' OR cln.CREDITO LIKE '3.1.1%')                               THEN 'Pessoal'
-            WHEN (cln.CREDITO LIKE '3.1.2%' OR cln.DEBITO LIKE '3.1.2%')                               THEN 'Serviços'
-            WHEN (cln.DEBITO LIKE '3.1.3%' OR cln.CREDITO LIKE '3.1.3%')                               THEN 'Custo'
-            WHEN (cln.DEBITO LIKE '3.1.4.1%' OR cln.CREDITO LIKE '3.1.4.1%' OR 
-                  cln.DEBITO LIKE '3.1.4.2%' OR cln.CREDITO LIKE '3.1.4.2%')                           THEN 'Encargos'
-            WHEN (cln.DEBITO LIKE '5.1.1.2%' OR cln.CREDITO LIKE '5.1.1.2%')                           THEN 'Liberação de Convênios'
-            WHEN (cln.DEBITO LIKE '5.2.2.1%' OR cln.CREDITO LIKE '5.2.2.1%')                           THEN 'Investimentos'
-            WHEN (cln.DEBITO LIKE '5.2.2.2%' OR cln.CREDITO LIKE '5.2.2.2%' OR
-                  cln.DEBITO LIKE '5.2.3.1%' OR cln.CREDITO LIKE '5.2.3.1%')                           THEN 'Imobilizado'
-            WHEN (cln.DEBITO LIKE '5.2.4.1.01%' OR cln.CREDITO LIKE '5.2.4.1.01%')                     THEN 'Depósito'
-            WHEN (cln.DEBITO LIKE '5.2.5.2.01.001' OR cln.CREDITO LIKE '5.2.5.2.01.001')               THEN 'Fundo'
-            WHEN (cln.DEBITO LIKE '5.2.5.3%')                                                         THEN 'Crédito'
-            WHEN (cln.DEBITO LIKE '1.9.5.%') -- Captura outras contas de débito específicas
-                 THEN CASE 
-                        WHEN cln.DEBITO LIKE '1.9.5.1.01.001' THEN 'Depósito'
-                        WHEN cln.DEBITO LIKE '1.9.5.1.01.003' THEN 'Fundo'
-                        WHEN cln.DEBITO LIKE '1.9.5.2.02%' THEN 'Investimentos'
-                        WHEN cln.DEBITO LIKE '1.9.5.2.03%' OR cln.DEBITO LIKE '1.9.5.2.04%' THEN 'Imobilizado'
-                        WHEN cln.DEBITO LIKE '1.9.5.7.01.001' THEN 'Liberação de Convênios'
-                      END
-            ELSE NULL
-        END AS TIPO_DESPESA,
+-- VERSÃO FINAL: Tradução do script T-SQL para um único SELECT com CTEs
 
-        COALESCE(cln.DEBITO, cln.CREDITO) AS COD_CONTA -- Simplificação; a lógica IIF era redundante
-        
-    FROM HUBDADOS.CorporeRM.CRATEIOLC AS crt
-    LEFT JOIN HUBDADOS.CorporeRM.CLANCA AS cln ON crt.LCTREF = cln.LCTREF
-    LEFT JOIN HUBDADOS.CorporeRM.TMOVCONT AS tmc ON cln.IDPARTIDA = tmc.IDPARTIDA
-    LEFT JOIN HUBDADOS.CorporeRM.TMOVCTB AS tct ON tmc.IDOPERACAO = tct.IDOPERACAO
-    LEFT JOIN HUBDADOS.CorporeRM.TMOV AS tmv ON tct.IDMOV = tmv.IDMOV
-    
-    -- 3. Filtros genéricos aplicados a todos os lançamentos
-    WHERE 
-        YEAR(cln.[DATA]) = :ano -- Usando parâmetro para o ano
-        AND cln.COMPLEMENTO IS NOT NULL
-        AND (cln.DEBITO NOT LIKE '2.4.1.1.01%' OR cln.DEBITO IS NULL)
+-- CTE 1: Substitui a tabela de variável @CONTAS
+WITH CONTAS_DE_INTERESSE AS (
+    SELECT CONTA FROM (VALUES
+        ('3.1.1.1.01.001'), ('3.1.1.1.01.002'), ('3.1.1.1.01.004'), ('3.1.1.1.01.005'), ('3.1.1.1.01.008'),
+        ('3.1.1.1.02.001'), ('3.1.1.1.03.001'), ('3.1.1.1.04.001'), ('3.1.1.1.04.999'), ('3.1.1.2.01.004'),
+        ('3.1.1.2.01.005'), ('3.1.1.2.01.006'), ('3.1.1.3.01.001'), ('3.1.1.3.01.002'), ('3.1.1.3.01.003'),
+        ('3.1.1.3.01.004'), ('3.1.1.3.01.005'), ('3.1.1.3.01.008'), ('3.1.1.3.01.999'), ('3.1.2.1.01.001'),
+        ('3.1.2.1.01.002'), ('3.1.2.1.02.001'), ('3.1.2.1.02.002'), ('3.1.2.1.02.003'), ('3.1.2.1.02.004'),
+        ('3.1.2.1.02.005'), ('3.1.2.1.02.006'), ('3.1.2.1.02.007'), ('3.1.2.1.02.008'), ('3.1.2.1.02.009'),
+        ('3.1.2.1.02.010'), ('3.1.2.1.02.013'), ('3.1.2.1.02.014'), ('3.1.2.1.02.019'), ('3.1.2.1.02.022'),
+        ('3.1.2.1.02.999'), ('3.1.2.1.03.001'), ('3.1.2.2.01.001'), ('3.1.2.2.01.002'), ('3.1.2.2.01.003'),
+        ('3.1.2.2.01.004'), ('3.1.2.2.01.005'), ('3.1.2.2.01.006'), ('3.1.2.2.01.008'), ('3.1.2.2.01.999'),
+        ('3.1.2.2.02.001'), ('3.1.2.2.02.002'), ('3.1.2.2.02.004'), ('3.1.2.2.02.007'), ('3.1.2.2.02.999'),
+        ('3.1.2.3.01.001'), ('3.1.3.1.01.001'), ('3.1.3.1.01.002'), ('3.1.3.1.01.003'), ('3.1.3.1.01.004'),
+        ('3.1.3.1.01.005'), ('3.1.3.1.01.006'), ('3.1.3.1.01.999'), ('3.1.3.1.02.001'), ('3.1.3.1.02.002'),
+        ('3.1.3.1.02.003'), ('3.1.3.1.02.004'), ('3.1.3.1.02.005'), ('3.1.3.1.02.006'), ('3.1.3.1.02.009'),
+        ('3.1.3.1.02.010'), ('3.1.3.1.02.999'), ('3.1.3.2.01.001'), ('3.1.3.2.01.002'), ('3.1.3.2.01.003'),
+        ('3.1.3.2.01.004'), ('3.1.3.2.01.999'), ('3.1.3.2.02.004'), ('3.1.3.3.01.001'), ('3.1.3.3.01.002'),
+        ('3.1.3.3.01.003'), ('3.1.3.3.01.005'), ('3.1.3.3.01.007'), ('3.1.3.3.01.008'), ('3.1.3.3.01.999'),
+        ('3.1.3.4.01.002'), ('3.1.3.4.01.003'), ('3.1.3.4.01.005'), ('3.1.3.4.01.999'), ('3.1.3.5.01.001'),
+        ('3.1.3.5.01.002'), ('3.1.3.5.01.003'), ('3.1.3.5.01.004'), ('3.1.3.5.01.005'), ('3.1.3.6.01.001'),
+        ('3.1.3.6.01.002'), ('3.1.3.6.01.003'), ('3.1.3.6.01.004'), ('3.1.3.6.01.005'), ('3.1.3.6.01.006'),
+        ('3.1.3.6.01.999'), ('3.1.3.7.01.001'), ('3.1.3.7.01.004'), ('3.1.3.7.01.005'), ('3.1.3.7.01.006'),
+        ('3.1.3.7.01.007'), ('3.1.3.7.01.008'), ('3.1.3.7.01.009'), ('3.1.3.7.01.010'), ('3.1.3.7.01.011'),
+        ('3.1.3.7.01.015'), ('3.1.3.7.01.021'), ('3.1.3.7.01.023'), ('3.1.3.7.01.999'), ('3.1.3.8.01.001'),
+        ('3.1.4.1.01.002'), ('3.1.4.1.01.003'), ('3.1.4.1.02.001'), ('3.1.4.2.01.001'), ('3.1.4.2.01.002'),
+        ('3.1.4.2.01.004'), ('3.1.4.2.01.005'), ('3.1.4.2.01.006'), ('3.1.4.2.01.007'), ('3.1.4.2.01.999'),
+        ('5.1.1.2.01.001'), ('5.2.2.2.01.001'), ('5.2.2.2.01.003'), ('5.2.2.2.01.004'), ('5.2.2.2.01.006'),
+        ('5.2.4.1.01.001'), ('5.2.5.2.01.001')
+    ) AS Contas(CONTA)
 ),
-
--- CTE para Centro de Custo permanece a mesma, mas com um JOIN mais limpo.
-CC AS (
-   SELECT
-        NivelAcao.CODCCUSTO,
-        NivelUnidade.CAMPOLIVRE AS ACAO,
+-- CTE 2: Substitui a tabela temporária #CCUSTO
+CENTROS_DE_CUSTO AS (
+    SELECT
+        NivelAcao.CODCCUSTO COLLATE Latin1_General_CI_AS AS CC,
+        NivelUnidade.CAMPOLIVRE AS UNIDADE,
         NivelProjeto.CAMPOLIVRE AS PROJETO,
-        NivelAcao.CAMPOLIVRE AS UNIDADE
-    FROM HUBDADOS.CorporeRM.GCCUSTO AS NivelAcao
-    -- Corrigindo a lógica para buscar os níveis hierárquicos corretos
-    LEFT JOIN HUBDADOS.CorporeRM.GCCUSTO AS NivelProjeto ON LEFT(NivelAcao.CODCCUSTO, 5) = NivelProjeto.CODCCUSTO
-    LEFT JOIN HUBDADOS.CorporeRM.GCCUSTO AS NivelUnidade ON LEFT(NivelAcao.CODCCUSTO, 12) = NivelUnidade.CODCCUSTO
+        NivelAcao.CAMPOLIVRE AS ACAO
+    FROM CorporeRM.GCCUSTO AS NivelAcao
+    LEFT JOIN CorporeRM.GCCUSTO AS NivelProjeto ON LEFT(NivelAcao.CODCCUSTO, 5) = NivelProjeto.CODCCUSTO
+    LEFT JOIN CorporeRM.GCCUSTO AS NivelUnidade ON LEFT(NivelAcao.CODCCUSTO, 12) = NivelUnidade.CODCCUSTO
     WHERE 
-        LEN(NivelAcao.CODCCUSTO) > 15 -- Filtra para o nível mais detalhado
+        LEN(NivelAcao.CODCCUSTO) = 16 AND NivelAcao.ATIVO = 'T' AND NivelAcao.PERMITELANC = 'T'
+),
+-- CTE 3: Substitui a tabela temporária #ORCAMENTO, unificando os lançamentos
+ORCAMENTO_UNIFICADO AS (
+    SELECT
+        RIGHT(crt.CODGERENCIAL, 16) COLLATE Latin1_General_CI_AS AS CC, 
+        cln.DEBITO COLLATE Latin1_General_CI_AS AS CONTA,
+        CASE WHEN pc.Natureza = 1 THEN cln.VALOR ELSE -1 * cln.VALOR END AS VALOR,
+        crt.IDRATEIO, crt.LCTREF, crt.IDPARTIDA, tmv.IDMOV, tmv.CODTMV, tmv.CAMPOLIVRE1 as CONTRATO,
+        tmv.CODUSUARIO, tmv.DATAEMISSAO, cln.COMPLEMENTO, cln.[DATA], tmv.CODCFO
+    FROM HUBDADOS.CorporeRM.CRATEIOLC crt
+    INNER JOIN HUBDADOS.CorporeRM.CLANCA cln ON crt.LCTREF = cln.LCTREF
+    INNER JOIN HUBDADOS.CorporeRM.TMOV tmv ON cln.INTEGRACHAVE = CAST(tmv.IDMOV AS VARCHAR(255))
+    INNER JOIN CorporeRM.CCONTA pc ON pc.CODCONTA = cln.DEBITO
+    WHERE cln.[DATA] >= :data_inicio AND cln.[DATA] < DATEADD(day, 1, CAST(:data_fim AS DATE))
+
+    UNION ALL
+
+    SELECT
+        RIGHT(crt.CODGERENCIAL, 16) COLLATE Latin1_General_CI_AS AS CC, 
+        cln.CREDITO COLLATE Latin1_General_CI_AS AS CONTA,
+        CASE WHEN pc.Natureza = 0 THEN cln.VALOR ELSE -1 * cln.VALOR END AS VALOR,
+        crt.IDRATEIO, crt.LCTREF, crt.IDPARTIDA, tmv.IDMOV, tmv.CODTMV, tmv.CAMPOLIVRE1 as CONTRATO,
+        tmv.CODUSUARIO, tmv.DATAEMISSAO, cln.COMPLEMENTO, cln.[DATA], tmv.CODCFO
+    FROM HUBDADOS.CorporeRM.CRATEIOLC crt
+    INNER JOIN HUBDADOS.CorporeRM.CLANCA cln ON crt.LCTREF = cln.LCTREF
+    INNER JOIN HUBDADOS.CorporeRM.TMOV tmv ON cln.INTEGRACHAVE = CAST(tmv.IDMOV AS VARCHAR(255))
+    INNER JOIN CorporeRM.CCONTA pc ON pc.CODCONTA = cln.CREDITO
+    WHERE cln.[DATA] >= :data_inicio AND cln.[DATA] < DATEADD(day, 1, CAST(:data_fim AS DATE))
 )
-
--- 4. Consulta Final
+-- CONSULTA FINAL: Junta as CTEs para gerar o resultado
 SELECT
-    bl.UNIFICAVALOR,
-    bl.TIPO_DESPESA,
-    REPLACE(cc.UNIDADE, CHAR(22), '') AS CLASSIFICA,
-    RIGHT(bl.CODGERENCIAL, 16) AS CODGERENCIAL,
-    REPLACE(bl.COMPLEMENTO, CHAR(22), '') AS COMPLEMENTO,
-    REPLACE(cc.PROJETO, CHAR(22), '') AS PROJETO,
-    REPLACE(cc.ACAO, CHAR(22), '') AS ACAO,
-    bl.[DATA],
-    REPLACE(CCTA.DESCRICAO, CHAR(22), '') AS DESCNVL6,
-    bl.COD_CONTA COLLATE Latin1_General_CI_AS AS COD_CONTA,
-    bl.CODCFO,
-    REPLACE(FCFO.NOME, CHAR(22), '') AS FORNECEDOR
-FROM BaseLancamentos AS bl
-LEFT JOIN CC ON CC.CODCCUSTO = RIGHT(bl.CODGERENCIAL, 16)
-LEFT JOIN HUBDADOS.CorporeRM.CCONTA AS CCTA ON CCTA.CODCONTA COLLATE Latin1_General_CI_AS = bl.COD_CONTA
-LEFT JOIN HUBDADOS.CorporeRM.FCFO AS FCFO ON FCFO.CODCFO = bl.CODCFO
-LEFT JOIN HUBDADOS.CorporeRM.TTMV AS TTMV ON TTMV.CODTMV = bl.CODTMV
-
--- 5. Aplica as exclusões específicas de cada tipo de despesa no final
+    orc.VALOR AS UNIFICAVALOR,
+    orc.COMPLEMENTO,
+    orc.[DATA],
+    orc.CONTA AS COD_CONTA,
+    REPLACE(fcf.NOME, CHAR(22), '') AS FORNECEDOR,
+    cc.UNIDADE AS CLASSIFICA,
+    cc.PROJETO,
+    cc.ACAO
+FROM ORCAMENTO_UNIFICADO AS orc
+INNER JOIN CONTAS_DE_INTERESSE AS f ON orc.CONTA = f.CONTA
+LEFT JOIN CENTROS_DE_CUSTO AS cc ON orc.CC = cc.CC
+LEFT JOIN HUBDADOS.CorporeRM.FCFO AS fcf ON orc.CODCFO = fcf.CODCFO
 WHERE 
-    bl.TIPO_DESPESA IS NOT NULL
-    AND NOT (bl.TIPO_DESPESA = 'Pessoal' AND bl.COMPLEMENTO LIKE 'Custo Serviço e financeiro referente ao ano de 2018')
-    AND NOT (bl.TIPO_DESPESA = 'Liberação de Convênios' AND bl.CODGERENCIAL LIKE '9.99999.999999.999')
-    AND NOT ((bl.TIPO_DESPESA = 'Imobilizado') AND (bl.DEBITO LIKE '7.2.3.1.01%' OR bl.DEBITO LIKE '7.2.2.2.01%'))
-    AND NOT (bl.TIPO_DESPESA = 'Investimentos' AND bl.IDRATEIO = '1929077')
-    AND NOT (bl.TIPO_DESPESA = 'Encargos' AND bl.IDRATEIO IN ('1537384', '1911286'))
-    AND NOT (bl.TIPO_DESPESA = 'Custo' AND bl.IDRATEIO = '1537388')
-    AND cc.UNIDADE = :unidade_gestora;
+    cc.UNIDADE = :unidade_gestora;
+

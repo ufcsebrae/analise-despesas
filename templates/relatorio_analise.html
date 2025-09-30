@@ -1,0 +1,37 @@
+<!-- analise_despesa/templates/relatorio_analise.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
+        h1, h2 { color: #005691; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f0f7ff; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Análise de Despesas - {{ unidade_gestora }}</h1>
+    <p>Relatório de referência para o período de <strong>{{ data_relatorio }}</strong>.</p>
+
+    <h2>Despesas Agregadas por Projeto</h2>
+    {{ tabela_projetos_html | safe }}
+
+    <h2>Top 10 Fornecedores</h2>
+    {{ tabela_fornecedores_html | safe }}
+    
+    {% if anomalias_encontradas %}
+        <h2>Anomalias de Valor Detectadas</h2>
+        <p>As seguintes transações foram marcadas como anômalas por se desviarem significativamente do padrão de valores:</p>
+        {{ tabela_anomalias_html | safe }}
+    {% else %}
+        <h2>Anomalias de Valor Detectadas</h2>
+        <p>Nenhuma anomalia de valor foi detectada nesta análise.</p>
+    {% endif %}
+    
+    <hr>
+    <p><em>Este é um e-mail gerado automaticamente.</em></p>
+</body>
+</html>

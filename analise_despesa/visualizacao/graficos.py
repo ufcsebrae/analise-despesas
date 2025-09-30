@@ -17,7 +17,7 @@ def plotar_top_fornecedores(df_top: pd.DataFrame, caminho_salvar: str):
     # Atribuímos a variável 'y' ('FORNECEDOR') ao parâmetro 'hue' para ter uma cor diferente
     # para cada barra e adicionamos legend=False para não mostrar a legenda redundante.
     sns.barplot(
-        x='UNIFICAVALOR', 
+        x='VALOR', 
         y='FORNECEDOR', 
         data=df_top, 
         palette='viridis', 

@@ -1,23 +1,20 @@
 # analise_despesa/leitor_local.py
-# VERSÃO FINAL: Corrigido para usar a coluna 'UNIDADE' para fatiamento
+# VERSÃO FINAL: Corrigido para usar a coluna 'UNIDADE'
 
 import logging
 import time
 import pandas as pd
 from typing import Optional, Dict, Any
-
 from .exceptions import AnaliseDespesaError
 
 logger = logging.getLogger(__name__)
 
-# Cache em memória para armazenar o DataFrame completo
 _FULL_DATA_CACHE: Optional[pd.DataFrame] = None
 _LAST_FILE_PATH: Optional[str] = None
 
 def carregar_e_fatiar_dados(params: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
     """
-    Lê dados de um arquivo CSV local, armazena em cache e fatia em memória
-    conforme a unidade gestora e o período especificados.
+    Lê o CSV, armazena em cache e fatia em memória pela coluna 'UNIDADE'.
     """
     global _FULL_DATA_CACHE, _LAST_FILE_PATH
 
@@ -34,23 +31,24 @@ def carregar_e_fatiar_dados(params: Optional[Dict[str, Any]] = None) -> pd.DataF
     try:
         if _FULL_DATA_CACHE is None or _LAST_FILE_PATH != arquivo_csv:
             logger.info(f"Carregando base de dados completa do arquivo: '{arquivo_csv}'")
-            inicio = time.perf_counter()
+            inicio_leitura = time.perf_counter()
             
-            _FULL_DATA_CACHE = pd.read_csv(arquivo_csv, sep=';', encoding='utf-8-sig', parse_dates=['DATA'])
+            _FULL_DATA_CACHE = pd.read_csv(
+                arquivo_csv, sep=';', encoding='utf-8-sig',
+                parse_dates=['DATA'], low_memory=False
+            )
             
             _LAST_FILE_PATH = arquivo_csv
-            fim = time.perf_counter()
-            logger.info(f"Arquivo CSV carregado e em cache. ({len(_FULL_DATA_CACHE)} linhas em {fim - inicio:.2f}s)")
+            fim_leitura = time.perf_counter()
+            logger.info(f"Arquivo CSV carregado e em cache. ({len(_FULL_DATA_CACHE)} linhas em {fim_leitura - inicio_leitura:.2f}s)")
         else:
             logger.info("Usando dados em cache do arquivo CSV.")
 
-        # ==============================================================================
-        # ||                        MUDANÇA CRÍTICA AQUI                          ||
-        # ==============================================================================
-        coluna_unidade = 'UNIDADE' # <--- CORRIGIDO: Agora usamos a coluna correta 'UNIDADE'
+        # --- PONTO CRÍTICO DA CORREÇÃO ---
+        coluna_unidade = 'UNIDADE' 
 
         if coluna_unidade not in _FULL_DATA_CACHE.columns:
-            raise AnaliseDespesaError(f"A coluna '{coluna_unidade}' não foi encontrada no arquivo CSV. Verifique a VIEW.")
+            raise AnaliseDespesaError(f"A coluna '{coluna_unidade}' não foi encontrada no CSV. Colunas disponíveis: {_FULL_DATA_CACHE.columns.tolist()}")
 
         df_unidade = _FULL_DATA_CACHE[
             (_FULL_DATA_CACHE[coluna_unidade] == unidade_gestora) &
@@ -62,7 +60,7 @@ def carregar_e_fatiar_dados(params: Optional[Dict[str, Any]] = None) -> pd.DataF
         return df_unidade
 
     except FileNotFoundError:
-        logger.error(f"ERRO CRÍTICO: Arquivo '{arquivo_csv}' não foi encontrado. Execute o script de exportação primeiro.")
+        logger.error(f"ERRO CRÍTICO: Arquivo '{arquivo_csv}' não foi encontrado.")
         raise
     except Exception as e:
         logger.error(f"Falha crítica ao processar o arquivo CSV local. Erro: {e}", exc_info=True)

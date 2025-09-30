@@ -13,7 +13,7 @@ def detectar_anomalias_de_valor(df: pd.DataFrame, contamination: float = 0.01) -
     df_analise = df.copy()
     
     # O modelo precisa de um array 2D, então usamos [[]]
-    valores = df_analise[['UNIFICAVALOR']]
+    valores = df_analise[['VALOR']]
     
     # O modelo funciona melhor se os valores nulos ou zero forem tratados
     valores = valores.fillna(0)

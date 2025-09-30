@@ -10,16 +10,16 @@ logger = logging.getLogger(__name__)
 
 def buscar_dados_completos(params: Dict[str, Any]) -> pd.DataFrame:
     """
-    Lê TODOS os dados para um ano inteiro da VIEW 'vw_AnaliseDespesas_CORRIGIDA'.
+    Lê TODOS os dados para um ano inteiro da VIEW 'vw_AnaliseDespesas'.
     """
-    logger.info("Iniciando extração completa da VIEW 'vw_AnaliseDespesas_CORRIGIDA'")
+    logger.info("Iniciando extração completa da VIEW 'vw_AnaliseDespesas'")
     inicio = time.perf_counter()
 
     engine = database.obter_conexao("SPSVSQL39_FINANCA")
     
     sql_query = f"""
         SELECT * 
-        FROM vw_AnaliseDespesas_CORRIGIDA
+        FROM vw_AnaliseDespesas
         WHERE [DATA] >= '{params["data_inicio"]}'
           AND [DATA] < DATEADD(day, 1, CAST('{params["data_fim"]}' AS DATE))
     """

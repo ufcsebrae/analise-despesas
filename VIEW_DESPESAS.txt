@@ -44,9 +44,9 @@ CENTROS_DE_CUSTO AS (
     LEFT JOIN HubDados.CorporeRM.GCCUSTO AS NivelUnidade ON LEFT(NivelAcao.CODCCUSTO, 12) = NivelUnidade.CODCCUSTO
     WHERE LEN(NivelAcao.CODCCUSTO) = 16 AND NivelAcao.ATIVO = 'T' AND NivelAcao.PERMITELANC = 'T'
 ),
--- CTE 3: Lançamentos de Orçamento
+-- CTE 3: LanÃ§amentos de OrÃ§amento
 ORCAMENTO_UNIFICADO AS (
-    -- Parte de Débito
+    -- Parte de DÃ©bito
     SELECT
         RIGHT(crt.CODGERENCIAL, 16) COLLATE Latin1_General_CI_AS AS CC, 
         cln.DEBITO COLLATE Latin1_General_CI_AS AS CONTA,
@@ -57,7 +57,7 @@ ORCAMENTO_UNIFICADO AS (
     LEFT JOIN HubDados.CorporeRM.TMOV tmv ON cln.INTEGRACHAVE = CAST(tmv.IDMOV AS VARCHAR(255))
     INNER JOIN HubDados.CorporeRM.CCONTA pc ON pc.CODCONTA = cln.DEBITO
     UNION ALL
-    -- Parte de Crédito
+    -- Parte de CrÃ©dito
     SELECT
         RIGHT(crt.CODGERENCIAL, 16) COLLATE Latin1_General_CI_AS AS CC, 
         cln.CREDITO COLLATE Latin1_General_CI_AS AS CONTA,
@@ -76,6 +76,7 @@ SELECT
     orc.CONTA AS COD_CONTA,
     REPLACE(fcf.NOME, CHAR(22), '') AS FORNECEDOR,
 	orc.LCTREF,
+	cc.CC,
     cc.UNIDADE,
     cc.PROJETO,
     cc.ACAO 

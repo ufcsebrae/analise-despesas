@@ -1,40 +1,39 @@
 # analise_despesa/config.py
-# VERSÃO REATORADA PARA PORTABILIDADE
+# VERSÃO FINAL: Centraliza TODAS as configurações do projeto.
 
 import os
+from typing import Dict, Any, Union, List
+from pathlib import Path
 from dotenv import load_dotenv
-from typing import Dict, Any, Union
-from pathlib import Path  # 1. Importar a biblioteca para lidar com caminhos
 
+# Carrega os SEGREDOS do arquivo .env
 load_dotenv()
 
-# 2. Definir o diretório raiz do projeto de forma dinâmica
-# (funciona em qualquer computador)
+# --- 1. DEFINIÇÃO DE CAMINHOS ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# 3. Definir um diretório padrão para todos os arquivos de saída (relatórios, logs, etc.)
 OUTPUT_DIR = BASE_DIR / "output"
-OUTPUT_DIR.mkdir(exist_ok=True)  # Cria o diretório se ele não existir
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# --- 1. PARÂMETROS GLOBAIS DA ANÁLISE ---
+# --- 2. PARÂMETROS GLOBAIS DA ANÁLISE (NÃO SÃO SEGREDOS) ---
 PARAMETROS_ANALISE: Dict[str, Union[int, str]] = {
     "ANO_REFERENCIA": 2025,
-    
-    # 4. Usar o novo caminho de saída dinâmico
-    "ARQUIVO_CSV_VERIFICACAO": str(OUTPUT_DIR / "base_completa_extraida_hoje.csv")
+    "ID_PERIODO_ORCAMENTO": "27",
+    "ARQUIVO_CSV_VERIFICACAO": str(OUTPUT_DIR / "base_completa_extraida.csv")
 }
 
-# --- 2. MAPEAMENTO DE GESTORES ---
-# (Esta seção permanece inalterada)
+# --- 3. PARÂMETROS PARA MÓDULOS ESPECÍFICOS (NÃO SÃO SEGREDOS) ---
+PROJETOS_A_IGNORAR_ANOMALIAS: List[str] = [
+    "Suporte a Negócios - Remuneração de Recursos Humanos Relacionado a Negócios",
+    "Gestão Operacional - Remuneração de Recursos Humanos - Custeio Administrativo",
+    "Contrato de Temporários"
+]
+
+# --- 4. MAPEAMENTO DE GESTORES (NÃO SÃO SEGREDOS) ---
 MAPA_GESTORES: Dict[str, str] = {
-    "SP - Finanças e Controladoria": "cesargl@sebraesp.com.br",
-    "SP - Inovação": "cesargl@sebraesp.com.br",
-    "SP - ER CAMPINAS": "cesargl@sebraesp.com.br",
-    "SP - Gestão de Soluções e Transformação Digital": "cesargl@sebraesp.com.br"
+    "SP - Cultura Empreendedora": "cesargl@sebraesp.com.br"
 }
 
-# --- 3. CONFIGURAÇÕES DE CONEXÃO ---
-# (Esta seção permanece inalterada)
+# --- 5. CONFIGURAÇÕES DE CONEXÃO (LÊ OS SEGREDOS DO .env) ---
 CONEXOES: Dict[str, Dict[str, Any]] = {
     "SPSVSQL39_FINANCA": {
         "tipo": "sql",

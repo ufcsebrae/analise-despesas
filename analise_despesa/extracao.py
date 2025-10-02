@@ -1,37 +1,49 @@
 # analise_despesa/extracao.py
-# VERSÃO FINAL: Lê a VIEW completa do banco de dados.
+# VERSÃO FINAL (AGORA COM A CERTEZA QUE OS SQLS ESTÃO COM '?'):
+# Usa '?' na query e passa os parâmetros como uma TUPLA.
 
 import logging
-import time
 import pandas as pd
-from typing import Dict, Any
-
 from . import database
 from .exceptions import AnaliseDespesaError
-from sqlalchemy import text
 from .utils import carregar_sql
 
 logger = logging.getLogger(__name__)
 
-
-
-def buscar_dados_completos(params: Dict[str, Any]) -> pd.DataFrame:
-    """Lê TODOS os dados para um ano inteiro da VIEW 'vw_AnaliseDespesas'."""
-    logger.info("Iniciando extração completa da VIEW 'vw_AnaliseDespesas'")
-    inicio = time.perf_counter()
-
-    engine = database.obter_conexao("SPSVSQL39_FINANCA")
+def buscar_dados_realizado(ano: int) -> pd.DataFrame:
+    """Lê os dados BRUTOS de despesas, usando marcador '?' na query."""
+    logger.info("Iniciando extração de dados BRUTOS do Realizado (estilo de parâmetro '?').")
     
-    # Carrega a query do arquivo .sql
-    sql_query_str = carregar_sql('sql/extracao_completa_vw.sql')
-    sql_query = text(sql_query_str) # Mantém o uso do text()
+    engine = database.obter_conexao("SPSVSQL39_FINANCA")
+    # Agora, sql_query_str DEVE conter '?' em vez de ':ano'.
+    sql_query_str = carregar_sql('sql/extracao_realizado.sql')
     
     try:
-        df = pd.read_sql(sql_query, engine, params={"ano": params['ano']})
+        # Passamos os parâmetros como uma TUPLA -> (ano,)
+        # A vírgula é importante para garantir que o Python crie uma tupla de um único elemento.
+        # Agora que o SQL tem '?', esta chamada está 100% correta.
+        df = pd.read_sql(sql_query_str, engine, params=(ano,))
         
-        fim = time.perf_counter()
-        logger.info(f"Leitura da VIEW concluída em {fim - inicio:.2f}s. ({len(df)} linhas)")
+        logger.info(f"Leitura do REALIZADO BRUTO concluída ({len(df)} linhas).")
         return df
     except Exception as e:
-        logger.error(f"Falha crítica na leitura da VIEW 'vw_AnaliseDespesas'. Erro: {e}", exc_info=True)
-        raise AnaliseDespesaError("Falha ao ler dados da VIEW.") from e
+        logger.error(f"Falha ao ler dados do Realizado. Verifique se o arquivo 'extracao_realizado.sql' realmente usa '?' como marcador de parâmetro. Erro detalhado: {e}", exc_info=True)
+        raise AnaliseDespesaError("Falha ao ler dados do Realizado.") from e
+
+def buscar_dados_orcamento(id_periodo: str) -> pd.DataFrame:
+    """Lê os dados de ORÇAMENTO, usando marcador '?' na query."""
+    logger.info("Iniciando extração de dados de ORÇAMENTO (estilo de parâmetro '?').")
+
+    engine = database.obter_conexao("SPSVSQL39_HubDados")
+    # Agora, sql_query_str DEVE conter '?' em vez de ':id_periodo'.
+    sql_query_str = carregar_sql('sql/extracao_orcamento.sql')
+    
+    try:
+        # Aplicando a mesma sintaxe de TUPLA aqui.
+        df = pd.read_sql(sql_query_str, engine, params=(id_periodo,))
+        
+        logger.info(f"Leitura do ORÇAMENTO concluída ({len(df)} linhas).")
+        return df
+    except Exception as e:
+        logger.error(f"Falha ao ler dados de Orçamento. Verifique se o arquivo 'extracao_orcamento.sql' usa '?' como marcador de parâmetro. Erro detalhado: {e}", exc_info=True)
+        raise AnaliseDespesaError("Falha ao ler dados de Orçamento.") from e

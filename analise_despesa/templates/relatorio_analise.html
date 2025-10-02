@@ -1,0 +1,92 @@
+<!-- relatorio_analise.html (VERSÃO FINAL COM TEXTOS EXPLICATIVOS MELHORADOS) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise de Despesas por Classificação</title>
+    <style>
+        body { font-family: 'Calibri', 'Segoe UI', sans-serif; color: #1f497d; line-height: 1.5; }
+        .container { max-width: 950px; margin: auto; padding: 20px; }
+        h1, h2, h3 { color: #1f497d; border-bottom: 1px solid #c6d9f1; padding-bottom: 8px; font-weight: bold; }
+        h1 { font-size: 26px; text-align: center; }
+        h2 { font-size: 22px; margin-top: 40px; }
+        h3 { font-size: 18px; margin-top: 25px; border-bottom: none; color: #4e81bd; }
+        table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 14px; }
+        th, td { border: 1px solid #c6d9f1; padding: 10px; text-align: left; }
+        th { background-color: #f2f7ff; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f8faff; }
+        .section-intro { font-size: 15px; color: #333; background-color: #f8faff; padding: 15px; border-left: 5px solid #5b9bd5; margin-bottom: 20px; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 25px; background-color: #f2f7ff; padding: 20px; border-radius: 5px; margin-bottom: 30px;}
+        .summary-label { font-weight: bold; color: #335b8a; }
+        .footer { text-align: center; color: #888; margin-top: 50px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Relatório Consolidado de Despesas</h1>
+        <p style="text-align: center;"><strong>Unidade:</strong> {{ unidade_gestora }} ({{ resumo.numero_unidade }}) | <strong>Data:</strong> {{ data_relatorio }}</p>
+
+        <h2>Resumo Executivo</h2>
+        <div class="summary-grid">
+            <div class="summary-item"><span class="summary-label">Mês de Referência:</span> {{ resumo.mes_referencia }}</div>
+            <div class="summary-item"><span class="summary-label">Ano de Referência:</span> {{ data_relatorio.split('/')[-1] }}</div>
+            <div class="summary-item"><span class="summary-label">Total Gasto (Mês):</span> {{ resumo.valor_total_mes }}</div>
+            <div class="summary-item"><span class="summary-label">Total Gasto (Ano):</span> {{ resumo.valor_total_ano }}</div>
+            <div class="summary-item"><span class="summary-label">Lançamentos (Mês):</span> {{ resumo.qtd_lancamentos_mes }}</div>
+            <div class="summary-item"><span class="summary-label">Lançamentos (Ano):</span> {{ resumo.qtd_lancamentos_ano }}</div>
+            <div class="summary-item" style="grid-column: 1 / -1;"><span class="summary-label">Principal Fornecedor (Projetos Exclusivos):</span> {{ resumo.principal_fornecedor_ano }} ({{ resumo.valor_principal_fornecedor_ano }})</div>
+        </div>
+
+        <h2>1. Execução Orçamentária (Ano)</h2>
+        <p class="section-intro">Aqui, a gente compara o que foi planejado (Orçado) com o que foi realmente gasto (Realizado). A coluna '% Execução' é um termômetro que mostra o quão perto estamos de usar todo o orçamento do ano para cada projeto.</p>
+        {% if tem_exclusivos %}
+            <h3>1.A: Projetos 100% da Unidade</h3>
+            {{ tabela_orc_exclusivo | safe }}
+        {% endif %}
+        {% if tem_compartilhados %}
+            <h3>1.B: Projetos Compartilhados com outras Unidades</h3>
+            {{ tabela_orc_compartilhado | safe }}
+        {% endif %}
+
+        <h2>2. Top 5 Fornecedores (Ano)</h2>
+        <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade ao longo do ano. Isso ajuda a entender quem são nossos parceiros mais importantes e onde os gastos estão concentrados.</p>
+        {% if tem_exclusivos %}
+            <h3>2.A: Fornecedores de Projetos Exclusivos</h3>
+            {{ tabela_forn_exclusivo | safe }}
+        {% endif %}
+        {% if tem_compartilhados %}
+            <h3>2.B: Fornecedores de Projetos Compartilhados</h3>
+            {{ tabela_forn_compartilhado | safe }}
+        {% endif %}
+
+        <h2>3. Desempenho Mensal (Ano)</h2>
+        <p class="section-intro">Como nossos gastos se comportaram mês a mês? Esta tabela mostra o ritmo das despesas ao longo do ano. A coluna 'Valor' mostra o gasto de cada mês, e a 'Acumulado' vai somando tudo, pra gente ver o total gasto até aquele ponto.</p>
+        {{ tabela_mes_agregado | safe }}
+
+        <h2>4. Detecção de Lançamentos Atípicos (Mês de Referência)</h2>
+        <!-- TEXTO DE ANOMALIAS RESTAURADO E MELHORADO -->
+        <p class="section-intro">
+            <strong>Metodologia Técnica Aplicada:</strong><br>
+            As transações abaixo foram destacadas por um modelo de inteligência artificial chamado <strong>Isolation Forest</strong>. Pense nele como um detetive que é especialista em achar "o estranho no ninho". Ele analisa todos os gastos do mês e aponta aqueles que são muito diferentes do padrão normal, seja por serem muito altos ou muito baixos.<br><br>
+            <strong>Qual o padrão deste mês? Para o robô, o valor mais comum (mediano) dos gastos normais em <u>{{ resumo.mes_referencia }}</u> foi de:</strong><br>
+            <strong style="font-size: 18px; color: #005691;">{{ resumo.valor_mediano_regular_mes }}</strong><br><br>
+            Os lançamentos listados abaixo, por destoarem bastante desse padrão, merecem sua atenção. Eles não são necessariamente erros, mas são pontos que vale a pena validar.<br>
+            <br><i>Para contexto, estes são os valores de referência do <strong>ano inteiro</strong> para a sua unidade: Média de Gasto: {{ resumo.media_lancamento_ano }} | Gasto Mediano: {{ resumo.mediana_lancamento_ano }} | Maior Gasto: {{ resumo.maior_lancamento_ano }} | Maior Crédito/Devolução: {{ resumo.menor_lancamento_ano }}</i>
+        </p>
+        {% if tem_anomalias_exclusivas %}
+            <h3>4.A: Anomalias em Projetos Exclusivos</h3>
+            {{ tabela_anom_exclusivo | safe }}
+        {% else %}
+            <p><strong>Projetos Exclusivos:</strong> Nenhum lançamento atípico foi detectado para o mês de referência.</p>
+        {% endif %}
+        {% if tem_anomalias_compartilhadas %}
+            <h3>4.B: Anomalias em Projetos Compartilhados</h3>
+            {{ tabela_anom_compartilhado | safe }}
+        {% else %}
+            <p><strong>Projetos Compartilhados:</strong> Nenhum lançamento atípico foi detectado para o mês de referência.</p>
+        {% endif %}
+        
+        <p class="footer">Este é um relatório gerado automaticamente pelo Sistema de Análise de Despesas.</p>
+    </div>
+</body>
+</html>

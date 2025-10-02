@@ -65,3 +65,4 @@ def carregar_e_fatiar_dados(params: Optional[Dict[str, Any]] = None) -> pd.DataF
     except Exception as e:
         logger.error(f"Falha crítica ao processar o arquivo CSV local. Erro: {e}", exc_info=True)
         raise AnaliseDespesaError("Falha ao ler ou fatiar o arquivo CSV.") from e
+    

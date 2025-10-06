@@ -1,4 +1,4 @@
-<!-- relatorio_analise.html (VERSÃO FINAL COM TEXTO DA TABELA 4 CORRIGIDO) -->
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -38,12 +38,13 @@
             <ul>
                 <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. Projetos "Compartilhados" têm despesas que podem ser rateadas entre múltiplas unidades.</li>
                 <li>
-                    <strong>Análise de Frequência e Raridade (Tabela 4):</strong> Esta é a principal análise de investigação. Em vez de usar um modelo complexo, agora usamos regras diretas e claras. O sistema procura por: 1) Combinações de Fornecedor-Projeto que aconteceram apenas uma vez no ano; e 2) Transações de fornecedores que são muito raros para a sua unidade.
+                    <strong>Ocorrências Atípicas de Contexto (Tabela 4):</strong> Esta é a principal análise de investigação. A IA agora analisa a "familiaridade" e o "desvio de valor" de cada transação. O modelo `IsolationForest` é treinado com métricas inteligentes, como a frequência do fornecedor/projeto e o Z-Score do valor, que mede quão estatisticamente incomum um valor é para seu grupo específico. Isso foca em encontrar eventos genuinamente estranhos, eliminando os ruídos.
                 </li>
-                <li><strong>Detecção de Tendência (Tabela 2):</strong> O robô analisa o ritmo dos seus gastos totais ao longo do ano. Se um mês tem um pico ou queda muito brusca em comparação com o padrão, ele sinaliza como "Pico Atípico" ou "Redução Atípica".</li>
+                <li><strong>Sinalização da IA na Tendência Mensal (Tabela 2):</strong> O robô analisa o ritmo dos seus gastos totais ao longo do ano. Se um mês tem um pico ou queda muito brusca em comparação com o padrão, ele sinaliza como "Pico Atípico" ou "Redução Atípica".</li>
                 <li><strong>Análise de Comportamento (Tabela 5):</strong> A IA agrupa os tipos de despesa dos seus projetos exclusivos em "perfis" com base no seu comportamento financeiro (valor, frequência e previsibilidade), revelando a natureza dos custos da sua unidade.</li>
             </ul>
         </div>
+
 
         <h2>Resumo Executivo</h2>
         <table class="summary-table">
@@ -65,7 +66,7 @@
             </tbody>
         </table>
 
-        <h2>1. Execução Orçamentária (Ano)</h2>
+        <h2>1. Execução Orçamentária - Ano</h2>
         <p class="section-intro">
             Comparamos o planejado (Orçado) com o gasto (Realizado). A coluna <strong>'Criticidade'</strong> age como um termômetro de risco, combinando a execução do orçamento com a ocorrência de ocorrências atípicas no ano (ver Tabela 4).<br>
             <strong>↑ Alto:</strong> Execução acima de 90%, ou acima de 75% com ocorrências atípicas.<br>
@@ -73,45 +74,48 @@
             <strong>↓ Baixo:</strong> Projetos dentro da normalidade e com orçamento sob controle.
         </p>
         {% if tem_exclusivos %}
-            <h3>1.A: Iniciativas exclusivas</h3>
+            <h3>1.a: Iniciativas exclusivas</h3>
             {{ tabela_orc_exclusivo | safe }}
         {% endif %}
         {% if tem_compartilhados %}
-            <h3>1.B: Iniciativas compartilhadas</h3>
+            <h3>1.b: Iniciativas compartilhadas</h3>
             {{ tabela_orc_compartilhado | safe }}
         {% endif %}
 
-        <h2>2. Desempenho Mensal (Ano)</h2>
+        <h2>2. Desempenho Mensal - Ano</h2>
         <p class="section-intro">
             Como nossos gastos se comportaram mês a mês? A coluna <strong>'Sinalização da IA'</strong> atua sobre o <strong>total dos gastos mensais da unidade (somando projetos exclusivos e compartilhados)</strong>. Ela utiliza um modelo de IA para identificar meses com picos ou quedas que fogem do padrão de gastos do ano. Um "Pico Atípico" ou "Redução Atípica" sinaliza desvios significativos no ritmo das despesas que merecem sua atenção.
         </p>
         {{ tabela_mes_agregado | safe }}
 
-        <h2>3. Top 5 Fornecedores (Ano)</h2>
+        <h2>3. Top 5 Fornecedores - Ano</h2>
         <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade.</p>
         {% if tem_fornecedores_exclusivos %}
-            <h3>3.A: Fornecedores de Iniciativas exclusivas</h3>
+            <h3>3.a: Fornecedores de Iniciativas exclusivas</h3>
             {{ tabela_forn_exclusivo | safe }}
         {% endif %}
         {% if tem_fornecedores_compartilhados %}
-            <h3>3.B: Fornecedores de Iniciativas compartilhadas</h3>
+            <h3>3.b: Fornecedores de Iniciativas compartilhadas</h3>
             {{ tabela_forn_compartilhado | safe }}
         {% endif %}
         
+        
         <h2>4. Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h2>
         <p class="section-intro">
-            <strong>Metodologia Aplicada (Análise de Frequência e Raridade):</strong><br>
-            Esta análise agora foca em regras claras para encontrar o que é genuinamente atípico no contexto dos seus projetos exclusivos. O sistema sinaliza duas situações:<br>
-            <strong>1. Combinações Inéditas:</strong> Lançamentos onde a dupla Fornecedor-Projeto aparece pela primeira vez no ano.<br>
-            <strong>2. Fornecedores Raros:</strong> Todas as transações de fornecedores que tiveram pouquíssima atividade (3 ou menos lançamentos) na sua unidade durante o ano inteiro.
+            <strong>Metodologia Técnica Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
+            Esta é nossa análise mais avançada. Em vez de apenas olhar para nomes, a IA agora age como um auditor estatístico, avaliando cada transação em três dimensões:<br>
+            <strong>1. Anomalia de Valor (Z-Score):</strong> O robô calcula a média e o desvio padrão dos gastos para <i>cada</i> combinação específica de Fornecedor-Projeto. Ele então mede quão longe (em desvios padrão) o valor do lançamento atual está da média do seu próprio grupo. Um Z-Score alto indica uma variação de valor estatisticamente significativa que foge à normalidade.<br>
+            <strong>2. Familiaridade do Fornecedor:</strong> O robô mede a frequência de atividade do fornecedor na sua unidade durante o ano.<br>
+            <strong>3. Familiaridade do Projeto:</strong> O robô mede a frequência de lançamentos no projeto.<br><br>
+            O modelo `IsolationForest` é treinado com essas três métricas inteligentes. Ele sinaliza ocorrências onde a combinação desses fatores é rara (ex: um valor muito atípico para um fornecedor comum, ou qualquer valor para um fornecedor muito raro), focando em eventos que são genuinamente incomuns.
         </p>
         {% if tem_ocorrencias_atipicas %}
             {{ tabela_ocorrencias_atipicas | safe }}
         {% else %}
-            <p>Nenhuma ocorrência atípica por raridade ou ineditismo foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
+            <p>Nenhuma ocorrência atípica de contexto foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
         {% endif %}
 
-        <h2>5. Análise de Comportamento: Contas de Projetos Exclusivos (IA)</h2>
+        <h2>5. Análise de Comportamento: Contas de Projetos Exclusivos (IA) - Mês de Referência</h2>
         <p class="section-intro">
             <strong>Metodologia Técnica Aplicada (K-Means Clustering):</strong><br>
             Esta análise utiliza Inteligência Artificial para agrupar os tipos de despesa dos **projetos exclusivos da sua unidade** (usando o agrupamento contábil de Nível 4) com base em seu "DNA" financeiro. O robô identifica padrões de comportamento usando três métricas principais:<br>

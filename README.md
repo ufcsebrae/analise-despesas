@@ -1,84 +1,134 @@
-# Projeto Análise de Despesas
+# Robô de Análise de Despesas com IA
 
-Este projeto é uma aplicação em Python para extrair, processar e analisar dados de despesas a partir de bancos de dados corporativos (SQL Server). Ele foi estruturado de forma modular para facilitar a manutenção e a escalabilidade.
+## 1. Visão Geral do Projeto
 
-## Funcionalidades Principais
+Este projeto é um robô de automação (`RPA - Robotic Process Automation`) construído em Python, projetado para realizar uma análise financeira e estratégica completa sobre as despesas de diferentes unidades de negócio.
 
--   **Extração de Dados:** Conecta-se a diferentes fontes de dados (SQL Server, Azure, etc.) usando configurações centralizadas.
--   **Gerenciamento de Queries:** As consultas SQL são armazenadas em arquivos `.sql` separados, facilitando sua edição e manutenção.
--   **Modularidade:** O código é dividido em módulos com responsabilidades únicas (conexão, execução, extração, etc.).
--   **Logging:** Registra informações e erros durante a execução para facilitar a depuração.
+O robô se conecta a bancos de dados, extrai dados brutos de despesas e orçamentos, os enriquece, e aplica uma série de modelos de análise e Inteligência Artificial para gerar insights acionáveis. O resultado final é um relatório em formato HTML, claro e intuitivo, que é automaticamente enviado por e-mail para os gestores responsáveis, com a base de dados da sua unidade anexada em `.csv`.
 
-## Estrutura do Projeto
+## 2. Principais Funcionalidades
+
+O relatório gerado pelo robô é composto por 5 análises principais:
+
+#### Tabela 1: Execução Orçamentária com Score de Criticidade
+- Compara o Orçado vs. Realizado para cada projeto.
+- **Inteligência Aplicada:** Introduz um **Score de Criticidade** (↑ Alto, → Médio, ↓ Baixo) que cruza a execução orçamentária com a ocorrência de anomalias no ano, permitindo uma priorização de atenção muito mais rápida.
+
+#### Tabela 2: Desempenho Mensal com Detecção de Tendência
+- Mostra a evolução dos gastos mensais, separados por projetos exclusivos e compartilhados.
+- **Inteligência Aplicada:** Utiliza o modelo de IA **`IsolationForest`** para analisar a série temporal dos gastos totais. Ele sinaliza meses com **"Pico Atípico"** ou **"Redução Atípica"**, destacando desvios significativos no ritmo financeiro da unidade.
+
+#### Tabela 3: Top 5 Fornecedores
+- Apresenta os principais fornecedores por valor total gasto no ano, segmentado por tipo de projeto.
+
+#### Tabela 4: Ocorrências Atípicas de Contexto
+- **Inteligência Aplicada:** Utiliza uma abordagem híbrida com **Engenharia de Features e `IsolationForest`**. A IA não olha apenas para o valor, mas para o "crachá de familiaridade" de cada transação, analisando:
+    1.  **Z-Score do Valor:** O quão estatisticamente incomum é um valor para sua combinação específica de Fornecedor-Projeto.
+    2.  **Frequência do Fornecedor:** O quão "conhecido" é o fornecedor para a unidade.
+    3.  **Frequência do Projeto:** O quão comum é a ocorrência de gastos nesse projeto.
+- O resultado é uma análise que encontra combinações genuinamente estranhas (ex: um fornecedor raro em um projeto raro), eliminando os "falsos positivos" de variações normais de valor.
+
+#### Tabela 5: Análise de Comportamento das Contas (Clusterização)
+- **Inteligência Aplicada:** Utiliza o modelo de IA **`K-Means Clustering`** para analisar o "DNA financeiro" dos tipos de despesa (agrupados pelo `DESC_NIVEL_4`) dos projetos exclusivos da unidade. Ele os segmenta em perfis como "Contas de Rotina", "Contas de Eventos Esporádicos", etc., com base em:
+    - Valor Total Anual
+    - Frequência de Lançamentos
+    - **Coeficiente de Variação (CV):** Uma medida estatística da imprevisibilidade dos gastos.
+
+## 3. Como Funciona (Arquitetura)
+
+O fluxo de trabalho é orquestrado pelo `main.py` e segue os seguintes passos:
+
+1.  **Configuração:** Carrega os parâmetros do `config.py`, incluindo o `MES_ANALISE_SOBRESCRITA`, que permite "voltar no tempo" para analisar um fechamento específico.
+2.  **Extração:** O `extracao.py` se conecta aos bancos de dados e extrai os dados brutos de despesas e orçamentos.
+3.  **Processamento e Enriquecimento:** Os dados são limpos e novas colunas, como as de data e tipo de projeto (Exclusivo/Compartilhado), são adicionadas.
+4.  **Loop por Unidade:** O robô inicia um loop para cada gestor definido no `MAPA_GESTORES` em `config.py`.
+5.  **Análises de IA:** Dentro do loop, para cada unidade:
+    - A **Análise de Comportamento (Tabela 5)** é executada sobre as contas dos projetos exclusivos da unidade.
+    - A **Detecção de Ocorrências Atípicas (Tabela 4)** é executada sobre os dados dos projetos exclusivos.
+6.  **Agregação:** As tabelas de Execução Orçamentária (com Score de Criticidade), Desempenho Mensal (com Sinalização da IA) e Top 5 Fornecedores são geradas.
+7.  **Comunicação:** O `comunicacao/email.py` recebe todos os DataFrames e resumos, renderiza o template `relatorio_analise.html` com os dados, gera um `.csv` com a base de despesas da unidade e envia o e-mail final com o anexo.
+
+## 4. Estrutura do Projeto
 
 ```
-analise-despesas/
-│
-├── sql/                    # Armazena os arquivos com as queries SQL.
-│   └── bd.sql
-│
-├── analise_despesa/        # Pacote principal com toda a lógica da aplicação.
-│   ├── config.py           # Dicionário com as configurações de conexão.
-│   ├── database.py         # Funções para criar conexões e salvar dados.
-│   ├── queries.py          # Mapeia nomes de queries aos arquivos SQL e conexões.
-│   ├── query_executor.py   # Classe que executa a query e retorna um DataFrame.
-│   ├── extracao.py         # Orquestra o processo de extração de dados.
-│   └── main.py             # Função principal que define o fluxo da análise.
-│
-├── .gitignore              # Arquivos e pastas a serem ignorados pelo Git.
-├── main.py                 # Ponto de entrada para executar o projeto.
-├── README.md               # Esta documentação.
-└── requirements.txt        # Lista de dependências Python do projeto.
+/analise-despesas
+|-- /analise_despesa
+|   |-- /analise
+|   |   |-- agregacao.py
+|   |   |-- insights_ia.py
+|   |   |-- __init__.py
+|   |-- /comunicacao
+|   |   |-- email.py
+|   |   |-- __init__.py
+|   |-- /processamento
+|   |   |-- enriquecimento.py
+|   |   |-- __init__.py
+|   |-- /templates
+|   |   |-- relatorio_analise.html
+|   |-- config.py
+|   |-- database.py
+|   |-- extracao.py
+|   |-- logging_config.py
+|   |-- utils.py
+|   |-- __init__.py
+|-- /logs
+|-- /output
+|-- /sql
+|   |-- extracao_realizado.sql
+|   |-- extracao_orcamento.sql
+|-- .env
+|-- .env.example
+|-- .gitignore
+|-- main.py
+|-- requirements.txt
+|-- README.md
 ```
 
-## Pré-requisitos
+## 5. Setup e Instalação
 
--   Python 3.9+
--   Git
--   ODBC Driver for SQL Server
+#### Pré-requisitos
+- Python 3.9+
+- Acesso à rede para os bancos de dados SQL Server.
+- Drivers ODBC para SQL Server instalados na máquina de execução.
 
-## Instalação
-
-Siga os passos abaixo para configurar o ambiente de desenvolvimento local.
-
-1.  **Clone o repositório:**
+#### Passos para Instalação
+1.  Clone este repositório:
     ```bash
     git clone <URL_DO_SEU_REPOSITORIO>
     cd analise-despesas
     ```
 
-2.  **Crie e ative um ambiente virtual:**
+2.  Crie e ative um ambiente virtual:
     ```bash
-    # Cria o ambiente virtual na pasta .venv
     python -m venv .venv
+    # No Windows
+    .venv\Scripts\activate
+    # No macOS/Linux
+    source .venv/bin/activate
     ```
-    -   **No Windows:**
-        ```powershell
-        .\.venv\Scripts\Activate.ps1
-        ```
-    -   **No Linux ou macOS:**
-        ```bash
-        source .venv/bin/activate
-        ```
 
-3.  **Instale as dependências:**
-    Com o ambiente virtual ativado, instale todas as bibliotecas necessárias a partir do `requirements.txt`.
+3.  Instale as dependências:
     ```bash
     pip install -r requirements.txt
     ```
 
-## Configuração
+4.  Configure as variáveis de ambiente. Copie o arquivo de exemplo:
+    ```bash
+    copy .env.example .env
+    ```
+    Agora, edite o arquivo `.env` e preencha com as credenciais corretas do seu banco de dados e servidor SMTP.
 
-Antes de executar, verifique o arquivo `analise_despesa/config.py`. Assegure-se de que as credenciais e os detalhes dos servidores (`servidor`, `banco`, etc.) estão corretos para o seu ambiente.
+## 6. Como Usar
 
-**⚠️ Atenção:** Nunca submeta senhas ou informações sensíveis diretamente no código para o repositório Git. Considere o uso de variáveis de ambiente para um ambiente de produção.
-
-## Como Usar
-
-Para executar a análise completa, basta rodar o `main.py` a partir da pasta raiz do projeto:
-
+Para executar o robô, basta rodar o script `main.py` a partir da raiz do projeto:
 ```bash
 python main.py
 ```
+O robô iniciará o processo e os logs serão exibidos no console e salvos no diretório `/logs`. Os relatórios em `.csv` serão salvos em `/output`.
 
-O script irá iniciar, conectar-se ao banco de dados, executar a query definida e exibir os logs do processo no terminal.
+## 7. Customização
+
+A maior parte da customização pode ser feita diretamente no arquivo `config.py`, sem necessidade de alterar o código principal:
+- **`MES_ANALISE_SOBRESCRITA`**: Defina um número de 1 a 12 para analisar um mês específico, ou `None` para usar o mês mais recente.
+- **`MAPA_GESTORES`**: Adicione ou remova gestores e seus respectivos e-mails.
+- **`PROJETOS_A_IGNORAR_ANOMALIAS`** e **`PROJETOS_FOLHA_PAGAMENTO`**: Ajuste as listas de projetos para refinar o escopo das análises.

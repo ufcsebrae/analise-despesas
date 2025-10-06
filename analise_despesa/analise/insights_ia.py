@@ -1,48 +1,90 @@
-# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM LÓGICA DE FREQUÊNCIA E RARIDADE)
+# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM Z-SCORE E ENGENHARIA DE FEATURES)
 import pandas as pd
 import logging
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.cluster import KMeans
+from scipy.sparse import hstack
 from typing import Dict, Tuple, Any
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-def detectar_anomalias_de_contexto(df: pd.DataFrame) -> pd.DataFrame:
+def detectar_anomalias_de_contexto(df: pd.DataFrame, contamination: float = 0.03) -> pd.DataFrame:
     """
-    Identifica ocorrências atípicas com base em regras de negócio claras:
-    1. Combinações de Fornecedor/Projeto que aparecem apenas uma vez no ano.
-    2. Transações de fornecedores que são muito raros para a unidade no ano.
+    Usa Engenharia de Features (Z-Score + Frequência) e Isolation Forest para encontrar ocorrências atípicas.
     """
-    if df.empty or len(df) < 2:
+    if df.empty or len(df) < 10: # Requisito mínimo para análise estatística
         logger.warning("Dados insuficientes para a análise de ocorrências atípicas de contexto.")
         return pd.DataFrame()
     
-    logger.info("Iniciando detecção de ocorrências por frequência e raridade...")
+    logger.info("Iniciando detecção de ocorrências atípicas com Engenharia de Features e Z-Score...")
     df_analise = df.copy()
 
-    # REGRA 1: Identificar combinações Fornecedor/Projeto que ocorrem apenas uma vez
-    frequencia_combinacao = df_analise.groupby(['FORNECEDOR', 'PROJETO'])['VALOR'].transform('count')
-    ocorrencias_combinacao_unica = df_analise[frequencia_combinacao == 1].copy()
-    ocorrencias_combinacao_unica['Justificativa IA'] = 'Combinação Fornecedor-Projeto inédita (ocorre apenas 1 vez no ano).'
-    
-    # REGRA 2: Identificar transações de fornecedores muito raros
-    frequencia_fornecedor = df_analise.groupby('FORNECEDOR')['FORNECEDOR'].transform('count')
-    # Consideramos "raro" um fornecedor com 3 ou menos transações no ano todo
-    ocorrencias_fornecedor_raro = df_analise[frequencia_fornecedor <= 3].copy()
-    ocorrencias_fornecedor_raro['Justificativa IA'] = 'Fornecedor raro (pouca atividade na unidade durante o ano).'
+    # --- ENGENHARIA DE FEATURES AVANÇADA ---
+    # 1. Calcula a frequência (familiaridade) de cada Fornecedor e Projeto
+    df_analise['FREQ_FORNECEDOR'] = df_analise.groupby('FORNECEDOR')['FORNECEDOR'].transform('count')
+    df_analise['FREQ_PROJETO'] = df_analise.groupby('PROJETO')['PROJETO'].transform('count')
 
-    # Unir os dois tipos de ocorrências e remover duplicatas, mantendo a primeira justificativa
-    ocorrencias_finais = pd.concat([ocorrencias_combinacao_unica, ocorrencias_fornecedor_raro]).drop_duplicates(subset=['DATA', 'FORNECEDOR', 'PROJETO', 'VALOR']).reset_index(drop=True)
+    # 2. Calcula o Z-Score do VALOR dentro de cada grupo (Fornecedor, Projeto)
+    group_stats = df_analise.groupby(['FORNECEDOR', 'PROJETO'])['VALOR'].agg(['mean', 'std']).reset_index()
+    df_analise = pd.merge(df_analise, group_stats, on=['FORNECEDOR', 'PROJETO'], how='left')
     
-    logger.info(f"Análise de frequência e raridade concluída. Encontradas {len(ocorrencias_finais)} ocorrências atípicas.")
+    df_analise['std'] = df_analise['std'].fillna(0)
+    df_analise['Z_SCORE_VALOR'] = np.where(df_analise['std'] > 0, (df_analise['VALOR'] - df_analise['mean']) / df_analise['std'], 0)
+    df_analise['Z_SCORE_VALOR'] = df_analise['Z_SCORE_VALOR'].fillna(0)
+
+    # 3. Define as features que a IA irá analisar
+    features_para_analise = ['Z_SCORE_VALOR', 'FREQ_FORNECEDOR', 'FREQ_PROJETO']
     
-    colunas_relevantes = ['DATA', 'FORNECEDOR', 'PROJETO', 'VALOR', 'COMPLEMENTO', 'Justificativa IA']
-    return ocorrencias_finais[colunas_relevantes]
+    # 4. Normaliza os dados
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(df_analise[features_para_analise])
+
+    # 5. Treina o modelo com as novas features inteligentes
+    modelo_ia = IsolationForest(contamination=contamination, random_state=42)
+    df_analise['ocorrencia_contexto'] = modelo_ia.fit_predict(features_scaled)
+    
+    ocorrencias_contexto = df_analise[df_analise['ocorrencia_contexto'] == -1].copy()
+    
+    logger.info(f"Análise de contexto com Z-Score concluída. Encontradas {len(ocorrencias_contexto)} ocorrências atípicas.")
+    
+    colunas_relevantes = ['DATA', 'FORNECEDOR', 'PROJETO', 'VALOR', 'COMPLEMENTO', 'Z_SCORE_VALOR']
+    return ocorrencias_contexto[colunas_relevantes]
 
 def investigar_causa_raiz_ocorrencia(df_ocorrencias: pd.DataFrame, df_historico_completo: pd.DataFrame) -> pd.DataFrame:
-    # Com a nova abordagem, a justificativa já vem pronta. Esta função apenas repassa os dados.
-    return df_ocorrencias
+    if df_ocorrencias.empty: return df_ocorrencias
+    logger.info(f"Iniciando investigação de causa raiz para {len(df_ocorrencias)} ocorrências...")
+    df_investigado = df_ocorrencias.copy()
+
+    freq_fornecedor_geral = df_historico_completo['FORNECEDOR'].value_counts()
+    freq_combinacao_geral = df_historico_completo.groupby(['FORNECEDOR', 'PROJETO']).size()
+
+    justificativas = []
+    for idx, ocorrencia in df_investigado.iterrows():
+        razoes = []
+        fornecedor = ocorrencia['FORNECEDOR']
+        projeto = ocorrencia['PROJETO']
+        
+        if 'Z_SCORE_VALOR' in ocorrencia and abs(ocorrencia['Z_SCORE_VALOR']) > 2.0:
+             razoes.append(f"Valor (R$ {ocorrencia['VALOR']:.0f}) é um pico ou vale estatístico (Z-Score: {ocorrencia['Z_SCORE_VALOR']:.2f}) para esta combinação Fornecedor/Projeto.")
+
+        if freq_combinacao_geral.get((fornecedor, projeto), 0) <= 2:
+            razoes.append(f"Combinação Fornecedor-Projeto rara (vista {freq_combinacao_geral.get((fornecedor, projeto), 0)}x no ano).")
+        
+        if freq_fornecedor_geral.get(fornecedor, 0) <= 3:
+            razoes.append(f"Fornecedor com baixa atividade geral na unidade ({freq_fornecedor_geral.get(fornecedor, 0)} lançamentos no ano).")
+
+        if not razoes:
+            razoes.append("Combinação de fatores (valor, frequência do fornecedor/projeto) considerada incomum pela IA.")
+            
+        justificativas.append(" | ".join(razoes))
+        
+    df_investigado['Justificativa IA'] = justificativas
+    df_investigado.drop(columns=['Z_SCORE_VALOR'], inplace=True, errors='ignore')
+    
+    logger.info("Investigação concluída.")
+    return df_investigado
 
 def segmentar_contas_por_comportamento(df_a_segmentar: pd.DataFrame, n_clusters: int = 3) -> Tuple[Dict[str, pd.DataFrame], Dict[str, Dict[str, Any]]]:
     # (Código inalterado)

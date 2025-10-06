@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL COM FILTRO PARA PROJETOS EXCLUSIVOS NA TABELA 4)
+# main.py (VERSÃO FINAL COM GERAÇÃO DE ANEXO CSV)
 
 import logging
 import datetime
@@ -7,8 +7,9 @@ from analise_despesa.logging_config import setup_logging
 from analise_despesa.extracao import buscar_dados_realizado, buscar_dados_orcamento
 from analise_despesa.analise import agregacao, insights_ia
 from analise_despesa.comunicacao import email
-from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, MES_ANALISE_SOBRESCRITA
+from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, MES_ANALISE_SOBRESCRITA, OUTPUT_DIR
 from analise_despesa.processamento import enriquecimento
+import os
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -64,7 +65,6 @@ def executar_analise_distribuida():
             df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
             df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
             
-            # --- CORREÇÃO: DETECÇÃO DE OCORRÊNCIAS APENAS EM PROJETOS EXCLUSIVOS ---
             df_ocorrencias_atipicas = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
             
             df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas)
@@ -75,7 +75,9 @@ def executar_analise_distribuida():
             
             meses_map = {1:'Jan', 2:'Fev', 3:'Mar', 4:'Abr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Set', 10:'Out', 11:'Nov', 12:'Dez'}
             resumo['mes_referencia'] = meses_map.get(mes_referencia_num, "N/A")
-            df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_atipicas, df_unidade_bruto)
+            
+            df_ocorrencias_filtradas = df_ocorrencias_atipicas[df_ocorrencias_atipicas['DATA'].dt.month == mes_referencia_num].copy()
+            df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_bruto)
             if not df_ocorrencias_investigadas.empty:
                 df_ocorrencias_investigadas.rename(columns={'VALOR': 'Realizado'}, inplace=True)
 
@@ -86,9 +88,22 @@ def executar_analise_distribuida():
                 df_mes_agregado=df_mes_agregado, df_ocorrencias_atipicas=df_ocorrencias_investigadas,
                 df_clusters_folha=df_clusters, resumo_clusters_folha=resumo_clusters
             )
-            assunto = f"Análise de Despesas - {unidade} - Ref {resumo['mes_referencia']}/{ano}"
-            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor)
-            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado.")
+            
+            # --- CORREÇÃO 1: AJUSTE DO TÍTULO DO E-MAIL ---
+            unidade_para_assunto = unidade.replace("SP - ", "")
+            assunto = f"Análise de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
+
+            # --- CORREÇÃO 2: GERAÇÃO DO ARQUIVO CSV PARA ANEXO ---
+            unidade_para_arquivo = unidade_para_assunto.replace(" ", "_")
+            nome_arquivo_csv = f"despesa_{ano}{resumo['mes_referencia']}_{unidade_para_arquivo}.csv"
+            caminho_anexo = OUTPUT_DIR / nome_arquivo_csv
+            
+            logger.info(f"Gerando arquivo de despesas para anexo em: {caminho_anexo}")
+            df_unidade_bruto.to_csv(caminho_anexo, index=False, sep=';', encoding='utf-8-sig')
+
+            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor, caminho_anexo=str(caminho_anexo))
+            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo.")
+
         except Exception as e:
             logger.critical(f"❌ Erro no processamento da unidade '{unidade}': {e}", exc_info=True)
     logger.info("✅ Pipeline finalizado com sucesso.")

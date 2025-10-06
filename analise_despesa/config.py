@@ -41,7 +41,10 @@ PROJETOS_FOLHA_PAGAMENTO: List[str] = [
 # --- 5. MAPEAMENTO DE GESTORES (NÃO SÃO SEGREDOS) ---
 MAPA_GESTORES: Dict[str, str] = {
     "SP - Finanças e Controladoria": "cesargl@sebraesp.com.br",
-    "SP - Cultura Empreendedora": "brunoo@sebraesp.com.br",
+    "SP - Cultura Empreendedora": "cesargl@sebraesp.com.br",
+    "SP - Atendimento ao Cliente": "cesargl@sebraesp.com.br",
+    "SP - Atendimento ao Cliente": "cesargl@sebraesp.com.br",
+    "SP - Desenvolvimento Setorial e Territorial": "cesargl@sebraesp.com.br",
     "SP - Administração": "cesargl@sebraesp.com.br"
 }
 

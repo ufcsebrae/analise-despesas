@@ -1,4 +1,4 @@
-<!-- relatorio_analise.html (VERSÃO FINAL QUE LÊ A ETIQUETA 'is_total') -->
+<!-- relatorio_analise.html (VERSÃO FINAL COM TEXTO DA TABELA 4 CORRIGIDO) -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -32,31 +32,29 @@
         </p>
 
         <div class="section-intro">
-            <p><strong>Prezado(a) Gestor(a),
-            <p>Este relatório foi gerado por um sistema de Inteligência Artificial (IA) para análise de dados financeiros, desenvolvido pela equipe de Finanças e Controladoria.</strong>
-            <p>O sistema processou os lançamentos de despesas para transformar dados em informações que apoiem sua gestão. Abaixo, detalhamos os conceitos e as análises realizadas pela IA:</p>
-            <p>Abaixo,você encontrará uma explicação dos principais conceitos e das análises de Inteligência Artificial (IA) que foi realizado:</p>
+            <p><strong>Prezado(a) gestor(a),</strong></p>
+            <p>Eu sou seu assistente de análise de dados. Meu trabalho é processar milhares de lançamentos financeiros e transformá-los em informações claras e acionáveis para apoiar sua gestão. Este relatório foi preparado por mim e destaca os pontos mais importantes sobre as despesas da sua unidade.</p>
+            <p><strong>Conceitos e Modelos de IA Utilizados:</strong></p>
             <ul>
-                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> A análise distingue projetos cujas despesas pertencem 100% à sua unidade ("Exclusivos") daqueles com despesas rateadas entre múltiplas unidades ("Compartilhados"). A distinção é importante para a governança e alocação dos gastos.</li>
+                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. Projetos "Compartilhados" têm despesas que podem ser rateadas entre múltiplas unidades.</li>
                 <li>
-                    <strong>Ocorrências Atípicas de Contexto (Tabela 4):</strong> Esta é a principal análise de IA. O sistema avalia cada lançamento não apenas pelo valor, mas pelo seu contexto (fornecedor, projeto, data, etc.). O modelo aprendeu o padrão de combinações de dados que é normal para sua unidade e sinalizou as transações que fogem a essa norma. A coluna "Justificativa IA" explica por que o lançamento foi considerado uma anomalia contextual.
+                    <strong>Análise de Frequência e Raridade (Tabela 4):</strong> Esta é a principal análise de investigação. Em vez de usar um modelo complexo, agora usamos regras diretas e claras. O sistema procura por: 1) Combinações de Fornecedor-Projeto que aconteceram apenas uma vez no ano; e 2) Transações de fornecedores que são muito raros para a sua unidade.
                 </li>
-                <li><strong>Sinalização da IA na Tendência Mensal (Tabela 2):</strong> O sistema analisa o ritmo dos gastos totais ao longo do ano para definir uma tendência. Se um mês apresenta um aumento ou queda que destoa do padrão histórico da unidade, ele é sinalizado como "Pico Atípico" ou "Redução Atípica".</li>
-                <li><strong>Análise de Comportamento (Tabela 5):</strong> A IA agrupa os tipos de despesa dos projetos exclusivos em perfis, com base em seu comportamento financeiro (por exemplo: gastos de valor alto e baixa frequência versus gastos de valor baixo e alta frequência). O objetivo é classificar a natureza dos custos da sua unidade.</li>
+                <li><strong>Detecção de Tendência (Tabela 2):</strong> O robô analisa o ritmo dos seus gastos totais ao longo do ano. Se um mês tem um pico ou queda muito brusca em comparação com o padrão, ele sinaliza como "Pico Atípico" ou "Redução Atípica".</li>
+                <li><strong>Análise de Comportamento (Tabela 5):</strong> A IA agrupa os tipos de despesa dos seus projetos exclusivos em "perfis" com base no seu comportamento financeiro (valor, frequência e previsibilidade), revelando a natureza dos custos da sua unidade.</li>
             </ul>
-        </div>  
+        </div>
 
         <h2>Resumo Executivo</h2>
         <table class="summary-table">
             <thead>
                 <tr>
                     <th>Indicador</th>
-                    <th style="text-align: left;">Mês</th>
-                    <th style="text-align: left;">Ano</th>
+                    <th style="text-align: right;">Mês</th>
+                    <th style="text-align: right;">Ano</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- CORREÇÃO AQUI: Adicionando o estilo condicional -->
                 {% for item in itens_resumo %}
                 <tr {% if item.is_total %}style="font-weight: bold; background-color: #eaf1fa;"{% endif %}>
                     <td>{{ item.indicador | safe }}</td>
@@ -102,19 +100,15 @@
         
         <h2>4. Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h2>
         <p class="section-intro">
-            <strong>Metodologia Técnica Aplicada (IA Avançada):</strong><br>
-            A IA (Isolation Forest) analisou todos os lançamentos dos <strong>projetos exclusivos</strong> da sua unidade e foi treinada para aprender as combinações "normais" entre <strong>Fornecedor, Projeto e Valor</strong>. As transações listadas abaixo são as que o robô considerou mais raras ou inéditas no contexto do ano inteiro. A coluna <strong>'Justificativa IA'</strong> age como um detetive, explicando o motivo da suspeita.
+            <strong>Metodologia Aplicada (Análise de Frequência e Raridade):</strong><br>
+            Esta análise agora foca em regras claras para encontrar o que é genuinamente atípico no contexto dos seus projetos exclusivos. O sistema sinaliza duas situações:<br>
+            <strong>1. Combinações Inéditas:</strong> Lançamentos onde a dupla Fornecedor-Projeto aparece pela primeira vez no ano.<br>
+            <strong>2. Fornecedores Raros:</strong> Todas as transações de fornecedores que tiveram pouquíssima atividade (3 ou menos lançamentos) na sua unidade durante o ano inteiro.
         </p>
-        {% if tem_contexto_exclusivo %}
-        <p class="section-intro">
-            <strong>Ênfase do Modelo:</strong> Para o robô, o valor mais comum (mediano) dos gastos nos projetos exclusivos no mês de referência foi de <strong style="color: #005691;">{{ resumo.valor_mediano_mes_exclusivo }}</strong>. A maioria dos gastos "normais" (os inliers) esteve na faixa de <strong style="color: #005691;">{{ resumo.min_normal_mes_exclusivo }}</strong> até <strong style="color: #005691;">{{ resumo.max_normal_mes_exclusivo }}</strong>.<br><br>
-            <small><i><strong>Contexto do Ano (Exclusivos):</strong> Média: {{ resumo.media_ano_exclusivo }} | Mediana: {{ resumo.mediana_ano_exclusivo }} | Max: {{ resumo.maior_ano_exclusivo }} | Min: {{ resumo.menor_ano_exclusivo }}</i></small>
-        </p>
-        {% endif %}
         {% if tem_ocorrencias_atipicas %}
             {{ tabela_ocorrencias_atipicas | safe }}
         {% else %}
-            <p>Nenhuma ocorrência atípica de contexto foi detectada nos dados do ano para os projetos exclusivos desta unidade.</p>
+            <p>Nenhuma ocorrência atípica por raridade ou ineditismo foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
         {% endif %}
 
         <h2>5. Análise de Comportamento: Contas de Projetos Exclusivos (IA)</h2>

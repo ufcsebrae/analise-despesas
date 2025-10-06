@@ -19,6 +19,7 @@ __pycache__/
 # A pasta 'outputs' contém relatórios e gráficos gerados em cada execução.
 # O código-fonte deve ser capaz de gerá-los novamente.
 outputs/
+output/
 
 # 5. Logs
 # Arquivos de log são específicos de cada execução e não devem ser versionados.

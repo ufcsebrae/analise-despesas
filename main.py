@@ -1,23 +1,95 @@
-# main.py (VERSÃO FINAL COM GERAÇÃO DE ANEXO CSV)
+# main.py (VERSÃO FINAL COM MODO INTERATIVO)
 
 import logging
 import datetime
 import pandas as pd
 from analise_despesa.logging_config import setup_logging
-from analise_despesa.extracao import buscar_dados_realizado, buscar_dados_orcamento
+from analise_despesa.extracao import buscar_dados_realizado, buscar_dados_orcamento, buscar_unidades_disponiveis
 from analise_despesa.analise import agregacao, insights_ia
 from analise_despesa.comunicacao import email
-from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, MES_ANALISE_SOBRESCRITA, OUTPUT_DIR
+from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, OUTPUT_DIR
 from analise_despesa.processamento import enriquecimento
 import os
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
+def obter_parametros_interativos():
+    """Coleta parâmetros do usuário via console."""
+    try:
+        print("\n--- Modo de Execução Interativa ---")
+        print("Pressione Enter para usar os valores padrão do config.py (Modo Automático).")
+        
+        ano_str = input(f"Digite o ano da análise (padrão: {PARAMETROS_ANALISE['ANO_REFERENCIA']}): ")
+        ano_interativo = int(ano_str) if ano_str else None
+
+        mes_str = input("Digite o mês de referência (1-12) (padrão: último mês dos dados): ")
+        mes_interativo = int(mes_str) if mes_str else None
+
+        # Apenas mostra as unidades se um dos parâmetros acima foi preenchido
+        if ano_str or mes_str:
+            unidades_disponiveis = buscar_unidades_disponiveis()
+            if not unidades_disponiveis:
+                print("Não foi possível buscar a lista de unidades.")
+                return ano_interativo, mes_interativo, {}, ""
+
+            print("\nUnidades de Negócio Disponíveis:")
+            for i, unidade in enumerate(unidades_disponiveis):
+                print(f"  {i+1}: {unidade}")
+            print("  Deixe em branco para analisar TODAS as unidades do mapa padrão.")
+
+            selecao_str = input("Digite o número da(s) unidade(s), separados por vírgula (ex: 1,3,5): ")
+            
+            unidades_selecionadas = []
+            email_destino = ""
+
+            if selecao_str:
+                try:
+                    indices = [int(i.strip()) for i in selecao_str.split(',')]
+                    unidades_selecionadas = [unidades_disponiveis[i-1] for i in indices if 0 < i <= len(unidades_disponiveis)]
+                    
+                    if unidades_selecionadas:
+                        email_destino = input("Digite o e-mail para receber o(s) relatório(s): ")
+                        if not email_destino:
+                            print("E-mail de destino é obrigatório no modo de seleção. Abortando.")
+                            return None, None, None, None
+                except (ValueError, IndexError):
+                    print("Seleção de unidade inválida. Abortando.")
+                    return None, None, None, None
+            
+            return ano_interativo, mes_interativo, unidades_selecionadas, email_destino
+        
+        # Se nem ano nem mês foram digitados, entra direto no modo automático
+        return None, None, [], ""
+
+    except KeyboardInterrupt:
+        print("\nExecução interrompida pelo usuário.")
+        return None, None, None, None
+    except Exception as e:
+        print(f"Ocorreu um erro durante a entrada de dados: {e}")
+        return None, None, None, None
+
 def executar_analise_distribuida():
+    # --- COLETA DE PARÂMETROS ---
+    ano_interativo, mes_interativo, unidades_selecionadas, email_destino = obter_parametros_interativos()
+    
+    if ano_interativo is None and mes_interativo is None and unidades_selecionadas is None:
+        return # Aborta se a entrada de dados foi invalidada ou interrompida
+
+    if unidades_selecionadas:
+        logger.info(f"--- MODO INTERATIVO ATIVADO ---")
+        logger.info(f"Unidades selecionadas: {unidades_selecionadas}")
+        logger.info(f"E-mail de destino: {email_destino}")
+        mapa_execucao = {unidade: email_destino for unidade in unidades_selecionadas}
+    else:
+        logger.info(f"--- MODO AUTOMÁTICO ATIVADO ---")
+        logger.info("Usando o mapa de gestores do arquivo config.py.")
+        mapa_execucao = MAPA_GESTORES
+
     logger.info("🚀 Iniciando pipeline completo...")
     try:
-        ano = PARAMETROS_ANALISE["ANO_REFERENCIA"]
+        ano = ano_interativo if ano_interativo else PARAMETROS_ANALISE["ANO_REFERENCIA"]
+        
         id_periodo = PARAMETROS_ANALISE["ID_PERIODO_ORCAMENTO"]
         df_realizado_bruto = buscar_dados_realizado(ano=ano)
         df_orcado = buscar_dados_orcamento(id_periodo=id_periodo)
@@ -38,15 +110,17 @@ def executar_analise_distribuida():
         return
 
     df_analise_principal = df_realizado_enriquecido.copy()
-    if MES_ANALISE_SOBRESCRITA:
-        logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {MES_ANALISE_SOBRESCRITA}. ")
-        df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= MES_ANALISE_SOBRESCRITA].copy()
+    if mes_interativo:
+        logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {mes_interativo}. ")
+        df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= mes_interativo].copy()
 
-    for unidade, email_gestor in MAPA_GESTORES.items():
+    for unidade, email_gestor_final in mapa_execucao.items():
         logger.info(f"================== PROCESSANDO UNIDADE: {unidade} ==================")
         try:
             df_unidade_bruto = df_analise_principal[df_analise_principal['UNIDADE'].str.strip() == unidade].copy()
-            if df_unidade_bruto.empty: continue
+            if df_unidade_bruto.empty: 
+                logger.warning(f"Nenhum dado encontrado para a unidade '{unidade}' no período selecionado. Pulando.")
+                continue
             df_unidade_integrado = df_integrado[df_integrado['UNIDADE'].str.strip() == unidade].copy()
             
             cod_unidade_analisada = "N/A"
@@ -58,17 +132,19 @@ def executar_analise_distribuida():
             resumo['numero_unidade'] = cod_unidade_analisada
             
             df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
+            
             df_clusters, resumo_clusters = {}, {}
-            if not df_unidade_exclusivos.empty:
-                df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
-
+            df_folha_unidade = df_unidade_exclusivos[df_unidade_exclusivos['PROJETO'].isin(PROJETOS_FOLHA_PAGAMENTO)].copy()
+            if not df_folha_unidade.empty:
+                df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_folha_unidade)
+            
             df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
             df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
             
-            df_ocorrencias_atipicas = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
+            df_ocorrencias_atipicas_ano = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
             
-            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas)
-            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_compartilhado, df_ocorrencias_atipicas)
+            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas_ano)
+            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_compartilhado, df_ocorrencias_atipicas_ano)
             df_fornecedores_exclusivo = agregacao.agregar_despesas_por_fornecedor(df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'], top_n=5)
             df_fornecedores_compartilhado = agregacao.agregar_despesas_por_fornecedor(df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Compartilhado'], top_n=5)
             df_mes_agregado = agregacao.agregar_despesas_por_mes(df_unidade_bruto)
@@ -76,7 +152,7 @@ def executar_analise_distribuida():
             meses_map = {1:'Jan', 2:'Fev', 3:'Mar', 4:'Abr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Set', 10:'Out', 11:'Nov', 12:'Dez'}
             resumo['mes_referencia'] = meses_map.get(mes_referencia_num, "N/A")
             
-            df_ocorrencias_filtradas = df_ocorrencias_atipicas[df_ocorrencias_atipicas['DATA'].dt.month == mes_referencia_num].copy()
+            df_ocorrencias_filtradas = df_ocorrencias_atipicas_ano[df_ocorrencias_atipicas_ano['DATA'].dt.month == mes_referencia_num].copy()
             df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_bruto)
             if not df_ocorrencias_investigadas.empty:
                 df_ocorrencias_investigadas.rename(columns={'VALOR': 'Realizado'}, inplace=True)
@@ -89,20 +165,18 @@ def executar_analise_distribuida():
                 df_clusters_folha=df_clusters, resumo_clusters_folha=resumo_clusters
             )
             
-            # --- CORREÇÃO 1: AJUSTE DO TÍTULO DO E-MAIL ---
             unidade_para_assunto = unidade.replace("SP - ", "")
             assunto = f"Análise de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
 
-            # --- CORREÇÃO 2: GERAÇÃO DO ARQUIVO CSV PARA ANEXO ---
             unidade_para_arquivo = unidade_para_assunto.replace(" ", "_")
             nome_arquivo_csv = f"despesa_{ano}{resumo['mes_referencia']}_{unidade_para_arquivo}.csv"
             caminho_anexo = OUTPUT_DIR / nome_arquivo_csv
             
             logger.info(f"Gerando arquivo de despesas para anexo em: {caminho_anexo}")
             df_unidade_bruto.to_csv(caminho_anexo, index=False, sep=';', encoding='utf-8-sig')
-
-            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor, caminho_anexo=str(caminho_anexo))
-            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo.")
+            
+            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor_final, caminho_anexo=str(caminho_anexo))
+            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo para '{email_gestor_final}'.")
 
         except Exception as e:
             logger.critical(f"❌ Erro no processamento da unidade '{unidade}': {e}", exc_info=True)

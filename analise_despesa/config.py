@@ -9,24 +9,22 @@ from dotenv import load_dotenv
 # Carrega os SEGREDOS do arquivo .env
 load_dotenv()
 
-# --- 1. PARÂMETRO DA "MÁQUINA DO TEMPO" ---
-# Defina um número (1-12) para forçar a análise em um mês específico.
-# Defina como None para usar o comportamento padrão (mês mais recente nos dados).
-MES_ANALISE_SOBRESCRITA = 9  # <--- AJUSTE AQUI PARA 9 (Setembro)
+# --- PARÂMETRO DA "MÁQUINA DO TEMPO" REMOVIDO ---
+# A lógica de sobrescrita de mês agora é feita de forma interativa no main.py
 
-# --- 2. DEFINIÇÃO DE CAMINHOS ---
+# --- DEFINIÇÃO DE CAMINHOS ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# --- 3. PARÂMETROS GLOBAIS DA ANÁLISE (NÃO SÃO SEGREDOS) ---
+# --- PARÂMETROS GLOBAIS DA ANÁLISE (NÃO SÃO SEGREDOS) ---
 PARAMETROS_ANALISE: Dict[str, Union[int, str]] = {
     "ANO_REFERENCIA": 2025,
     "ID_PERIODO_ORCAMENTO": "27",
     "ARQUIVO_CSV_VERIFICACAO": str(OUTPUT_DIR / "base_completa_extraida.csv")
 }
 
-# --- 4. PARÂMETROS PARA MÓDULOS ESPECÍFICOS (NÃO SÃO SEGREDOS) ---
+# --- PARÂMETROS PARA MÓDULOS ESPECÍFICOS (NÃO SÃO SEGREDOS) ---
 PROJETOS_A_IGNORAR_ANOMALIAS: List[str] = [
     "Suporte a Negócios - Remuneração de Recursos Humanos Relacionado a Negócios",
     "Gestão Operacional - Remuneração de Recursos Humanos - Custeio Administrativo",
@@ -38,17 +36,14 @@ PROJETOS_FOLHA_PAGAMENTO: List[str] = [
     "Gestão Operacional - Remuneração de Recursos Humanos - Custeio Administrativo",
 ]
 
-# --- 5. MAPEAMENTO DE GESTORES (NÃO SÃO SEGREDOS) ---
+# --- MAPEAMENTO DE GESTORES (AGORA É O "MODO PADRÃO/AUTOMÁTICO") ---
 MAPA_GESTORES: Dict[str, str] = {
     "SP - Finanças e Controladoria": "cesargl@sebraesp.com.br",
     "SP - Cultura Empreendedora": "cesargl@sebraesp.com.br",
-    "SP - Atendimento ao Cliente": "cesargl@sebraesp.com.br",
-    "SP - Atendimento ao Cliente": "cesargl@sebraesp.com.br",
-    "SP - Desenvolvimento Setorial e Territorial": "cesargl@sebraesp.com.br",
     "SP - Administração": "cesargl@sebraesp.com.br"
 }
 
-# --- 6. CONFIGURAÇÕES DE CONEXÃO (LÊ OS SEGREDOS DO .env) ---
+# --- CONFIGURAÇÕES DE CONEXÃO (LÊ OS SEGREDOS DO .env) ---
 CONEXOES: Dict[str, Dict[str, Any]] = {
     "SPSVSQL39_FINANCA": {
         "tipo": "sql",

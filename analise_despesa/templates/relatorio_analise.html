@@ -1,4 +1,4 @@
-<!-- relatorio_analise.html (VERSÃO FINAL COM INTRODUÇÃO E NOVOS TEXTOS) -->
+<!-- relatorio_analise.html (VERSÃO FINAL QUE LÊ A ETIQUETA 'is_total') -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -31,29 +31,34 @@
             <strong>Data de Emissão:</strong> {{ data_relatorio }}
         </p>
 
-        <!-- NOVA SEÇÃO DE INTRODUÇÃO -->
         <div class="section-intro">
-            <p>Este relatório apresenta uma análise detalhada das despesas, combinando visões financeiras tradicionais com insights gerados por Inteligência Artificial para apoiar a tomada de decisão.</p>
-            <p><strong>Conceitos e Modelos de IA Utilizados:</strong></p>
+            <p><strong>Prezado(a) Gestor(a),
+            <p>Este relatório foi gerado por um sistema de Inteligência Artificial (IA) para análise de dados financeiros, desenvolvido pela equipe de Finanças e Controladoria.</strong>
+            <p>O sistema processou os lançamentos de despesas para transformar dados em informações que apoiem sua gestão. Abaixo, detalhamos os conceitos e as análises realizadas pela IA:</p>
+            <p>Abaixo,você encontrará uma explicação dos principais conceitos e das análises de Inteligência Artificial (IA) que foi realizado:</p>
             <ul>
-                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. Projetos "Compartilhados" têm despesas divididas entre múltiplas unidades. Esta distinção é crucial para entender a governança dos gastos.</li>
-                <li><strong>Isolation Forest (Tabelas 2 e 4):</strong> Modelo de IA usado para "isolar" pontos de dados que fogem do padrão. Ele é eficaz em detectar tanto variações na tendência de gastos mensais quanto combinações incomuns de despesa, fornecedor e projeto.</li>
-                <li><strong>K-Means Clustering (Tabela 5):</strong> Modelo de IA que agrupa dados em "perfis" com base em suas características. Usamos este modelo para encontrar o "DNA" financeiro dos tipos de despesa da sua unidade, revelando padrões de comportamento.</li>
+                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> A análise distingue projetos cujas despesas pertencem 100% à sua unidade ("Exclusivos") daqueles com despesas rateadas entre múltiplas unidades ("Compartilhados"). A distinção é importante para a governança e alocação dos gastos.</li>
+                <li>
+                    <strong>Ocorrências Atípicas de Contexto (Tabela 4):</strong> Esta é a principal análise de IA. O sistema avalia cada lançamento não apenas pelo valor, mas pelo seu contexto (fornecedor, projeto, data, etc.). O modelo aprendeu o padrão de combinações de dados que é normal para sua unidade e sinalizou as transações que fogem a essa norma. A coluna "Justificativa IA" explica por que o lançamento foi considerado uma anomalia contextual.
+                </li>
+                <li><strong>Sinalização da IA na Tendência Mensal (Tabela 2):</strong> O sistema analisa o ritmo dos gastos totais ao longo do ano para definir uma tendência. Se um mês apresenta um aumento ou queda que destoa do padrão histórico da unidade, ele é sinalizado como "Pico Atípico" ou "Redução Atípica".</li>
+                <li><strong>Análise de Comportamento (Tabela 5):</strong> A IA agrupa os tipos de despesa dos projetos exclusivos em perfis, com base em seu comportamento financeiro (por exemplo: gastos de valor alto e baixa frequência versus gastos de valor baixo e alta frequência). O objetivo é classificar a natureza dos custos da sua unidade.</li>
             </ul>
-        </div>
+        </div>  
 
         <h2>Resumo Executivo</h2>
         <table class="summary-table">
             <thead>
                 <tr>
                     <th>Indicador</th>
-                    <th style="text-align: right;">Mês</th>
-                    <th style="text-align: right;">Ano</th>
+                    <th style="text-align: left;">Mês</th>
+                    <th style="text-align: left;">Ano</th>
                 </tr>
             </thead>
             <tbody>
+                <!-- CORREÇÃO AQUI: Adicionando o estilo condicional -->
                 {% for item in itens_resumo %}
-                <tr>
+                <tr {% if item.is_total %}style="font-weight: bold; background-color: #eaf1fa;"{% endif %}>
                     <td>{{ item.indicador | safe }}</td>
                     <td>{{ item.mes }}</td>
                     <td>{{ item.ano }}</td>
@@ -80,12 +85,20 @@
 
         <h2>2. Desempenho Mensal (Ano)</h2>
         <p class="section-intro">
-            Como nossos gastos se comportaram mês a mês? Esta tabela mostra o ritmo das despesas da sua unidade. A nova coluna <strong>'Sinalização da IA'</strong> analisa a tendência dos gastos mensais (somando exclusivos e compartilhados) e alerta para meses com picos ou quedas que fogem do padrão do ano, ajudando a identificar rapidamente desvios significativos no ritmo das despesas.
+            Como nossos gastos se comportaram mês a mês? A coluna <strong>'Sinalização da IA'</strong> atua sobre o <strong>total dos gastos mensais da unidade (somando projetos exclusivos e compartilhados)</strong>. Ela utiliza um modelo de IA para identificar meses com picos ou quedas que fogem do padrão de gastos do ano. Um "Pico Atípico" ou "Redução Atípica" sinaliza desvios significativos no ritmo das despesas que merecem sua atenção.
         </p>
         {{ tabela_mes_agregado | safe }}
 
         <h2>3. Top 5 Fornecedores (Ano)</h2>
-        <!-- (Texto inalterado) -->
+        <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade.</p>
+        {% if tem_fornecedores_exclusivos %}
+            <h3>3.A: Fornecedores de Iniciativas exclusivas</h3>
+            {{ tabela_forn_exclusivo | safe }}
+        {% endif %}
+        {% if tem_fornecedores_compartilhados %}
+            <h3>3.B: Fornecedores de Iniciativas compartilhadas</h3>
+            {{ tabela_forn_compartilhado | safe }}
+        {% endif %}
         
         <h2>4. Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h2>
         <p class="section-intro">

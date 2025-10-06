@@ -1,4 +1,4 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM NOVAS LINHAS NO RESUMO)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM A ETIQUETA 'is_total')
 
 import pandas as pd
 import logging, os, smtplib
@@ -34,19 +34,18 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
         if pd.isna(value): return "N/A"
         return f"{value:.0%}"
 
-    # --- CORREÇÃO: Adicionando as novas linhas de gastos ---
+    # --- CORREÇÃO AQUI: Adicionando a etiqueta 'is_total' ---
     itens_resumo = [
-        {"indicador": "Total Gasto (Realizado)", "mes": robust_currency_formatter(resumo.get("valor_total_mes")), "ano": robust_currency_formatter(resumo.get("valor_total_ano"))},
-        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas exclusivas", "mes": robust_currency_formatter(resumo.get("gastos_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("gastos_ano_exclusivo"))},
-        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas compartilhadas", "mes": robust_currency_formatter(resumo.get("gastos_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("gastos_ano_compartilhado"))},
-        {"indicador": "Orçamento Planejado (a+b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_referencia")), "ano": robust_currency_formatter(resumo.get("orcamento_planejado_ano"))},
-        {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas exclusivas (a)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("orcamento_total_exclusivo"))},
-        {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas compartilhadas (b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("orcamento_total_compartilhado"))},
-        {"indicador": "Total de Lançamentos", "mes": resumo.get("qtd_lancamentos_mes"), "ano": resumo.get("qtd_lancamentos_ano")},
+        {"indicador": "Total Gasto (Realizado)", "mes": robust_currency_formatter(resumo.get("valor_total_mes")), "ano": robust_currency_formatter(resumo.get("valor_total_ano")), "is_total": True},
+        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas exclusivas", "mes": robust_currency_formatter(resumo.get("gastos_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("gastos_ano_exclusivo")), "is_total": False},
+        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas compartilhadas", "mes": robust_currency_formatter(resumo.get("gastos_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("gastos_ano_compartilhado")), "is_total": False},
+        {"indicador": "Orçamento Planejado (a+b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_referencia")), "ano": robust_currency_formatter(resumo.get("orcamento_planejado_ano")), "is_total": True},
+        {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas exclusivas (a)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("orcamento_total_exclusivo")), "is_total": False},
+        {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas compartilhadas (b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("orcamento_total_compartilhado")), "is_total": False},
+        {"indicador": "Total de Lançamentos", "mes": resumo.get("qtd_lancamentos_mes"), "ano": resumo.get("qtd_lancamentos_ano"), "is_total": True},
     ]
 
     resumo_formatado = {
-        # (código inalterado)
         "numero_unidade": resumo.get("numero_unidade"), "mes_referencia": resumo.get("mes_referencia"),
         "valor_mediano_mes_exclusivo": robust_currency_formatter(resumo.get("valor_mediano_mes_exclusivo")),
         "min_normal_mes_exclusivo": robust_currency_formatter(resumo.get("min_normal_mes_exclusivo")), "max_normal_mes_exclusivo": robust_currency_formatter(resumo.get("max_normal_mes_exclusivo")),
@@ -80,10 +79,13 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
     return template.render(
         unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo_formatado, itens_resumo=itens_resumo,
         tem_exclusivos=not df_orcamento_exclusivo.empty, tem_compartilhados=not df_orcamento_compartilhado.empty,
+        tem_fornecedores_exclusivos=not df_fornecedores_exclusivo.empty, tem_fornecedores_compartilhados=not df_fornecedores_compartilhado.empty,
         tem_ocorrencias_atipicas=not df_ocorrencias_atipicas.empty,
         tem_contexto_exclusivo=resumo.get("valor_mediano_mes_exclusivo") is not None, tem_contexto_compartilhado=resumo.get("valor_mediano_mes_compartilhado") is not None,
         tem_clusters_folha=bool(df_clusters_folha), clusters_folha=clusters_folha_html, resumo_clusters_folha=resumo_clusters_formatado, **tabelas_html
     )
+
+
 
 def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str):
     logger.info(f"Iniciando envio de e-mail para {destinatario} via SMTP...")

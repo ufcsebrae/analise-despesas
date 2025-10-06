@@ -1,4 +1,4 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM SUPORTE A ANEXOS)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM CORREÇÃO DO ANEXO)
 
 import pandas as pd
 import logging, os, smtplib
@@ -20,7 +20,7 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
                               df_ocorrencias_atipicas: pd.DataFrame,
                               df_clusters_folha: Dict[str, pd.DataFrame],
                               resumo_clusters_folha: Dict[str, Dict[str, Any]]) -> str:
-    # (Código desta função permanece inalterado)
+    # (O código desta função permanece inalterado)
     logger.info("Gerando corpo de e-mail com todas as análises...")
     template = env.get_template('relatorio_analise.html')
     def robust_currency_formatter(value):
@@ -41,7 +41,6 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
     clusters_folha_html = {name: df.to_html(index=False, na_rep='-', classes='table', formatters=formatters['folha_cluster']) for name, df in df_clusters_folha.items()}
     return template.render(unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo_formatado, itens_resumo=itens_resumo, tem_exclusivos=not df_orcamento_exclusivo.empty, tem_compartilhados=not df_orcamento_compartilhado.empty, tem_fornecedores_exclusivos=not df_fornecedores_exclusivo.empty, tem_fornecedores_compartilhados=not df_fornecedores_compartilhado.empty, tem_ocorrencias_atipicas=not df_ocorrencias_atipicas.empty, tem_contexto_exclusivo=resumo.get("valor_mediano_mes_exclusivo") is not None, tem_contexto_compartilhado=resumo.get("valor_mediano_mes_compartilhado") is not None, tem_clusters_folha=bool(df_clusters_folha), clusters_folha=clusters_folha_html, resumo_clusters_folha=resumo_clusters_formatado, **tabelas_html)
 
-# --- CORREÇÃO: Função atualizada para aceitar um anexo ---
 def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, caminho_anexo: str = None):
     logger.info(f"Iniciando envio de e-mail para {destinatario} via SMTP...")
     smtp_host = os.getenv("SMTP_HOST")
@@ -52,30 +51,26 @@ def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, cami
         logger.error("Credenciais SMTP não configuradas. O e-mail não pode ser enviado.")
         return
     try:
-        # A mensagem principal agora é 'mixed' para suportar corpo e anexo
         msg = MIMEMultipart()
         msg['Subject'] = assunto
         msg['From'] = smtp_user
         msg['To'] = destinatario
 
-        # Anexa o corpo HTML
         msg.attach(MIMEText(corpo_html, 'html'))
         
         # --- LÓGICA PARA ANEXAR O ARQUIVO ---
         if caminho_anexo:
             logger.info(f"Anexando arquivo: {caminho_anexo}")
-            with open(caminho_anexo, "rb") as attachment:
-                # O MIMEBase é genérico para qualquer tipo de arquivo
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(attachment.read())
             
-            # Codifica o anexo em base64
-            encoders.encode_base64(part)
-            
-            # Adiciona o cabeçalho para o cliente de e-mail saber o que fazer
+            # --- CORREÇÃO AQUI ---
+            # Abrimos o arquivo em modo texto e usamos MIMEText com o subtipo 'csv'
+            with open(caminho_anexo, "r", encoding="utf-8-sig") as attachment:
+                part = MIMEText(attachment.read(), "csv", "utf-8")
+
+            # Adicionamos o cabeçalho para garantir que ele seja tratado como um anexo para download
             part.add_header(
                 "Content-Disposition",
-                f"attachment; filename= {os.path.basename(caminho_anexo)}",
+                f"attachment; filename={os.path.basename(caminho_anexo)}",
             )
             msg.attach(part)
             logger.info("Arquivo anexado com sucesso.")

@@ -1,4 +1,4 @@
-# analise_despesa/extracao.py (VERSÃO FINAL COM BUSCA DE UNIDADES)
+# analise_despesa/extracao.py (VERSÃO FINAL COM QUERY OTIMIZADA)
 
 import logging
 import pandas as pd
@@ -6,6 +6,7 @@ from . import database
 from .exceptions import AnaliseDespesaError
 from .utils import carregar_sql
 from typing import List
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def buscar_dados_realizado(ano: int) -> pd.DataFrame:
         raise AnaliseDespesaError("Falha ao ler dados do Realizado.") from e
 
 def buscar_dados_orcamento(id_periodo: str) -> pd.DataFrame:
-    """Lê os dados de ORÇAMENTO."""
+    """Lê os dados de OR��AMENTO."""
     logger.info("Iniciando extração de dados de ORÇAMENTO.")
 
     engine = database.obter_conexao("SPSVSQL39_HubDados")
@@ -49,18 +50,33 @@ def buscar_dados_orcamento(id_periodo: str) -> pd.DataFrame:
         logger.error(f"Falha ao ler dados de Orçamento. Erro: {e}", exc_info=True)
         raise AnaliseDespesaError("Falha ao ler dados de Orçamento.") from e
 
-# --- NOVA FUNÇÃO ---
 def buscar_unidades_disponiveis() -> List[str]:
-    """Busca no banco de dados todas as unidades de negócio únicas."""
+    """Busca no banco de dados todas as unidades de negócio únicas de forma otimizada."""
     logger.info("Buscando lista de unidades de negócio disponíveis...")
     engine = database.obter_conexao("SPSVSQL39_FINANCA")
     try:
-        # A query assume que a sua view principal é a fonte das unidades
-        query = "SELECT DISTINCT UNIDADE FROM vw_AnaliseDespesa WHERE UNIDADE IS NOT NULL ORDER BY UNIDADE ASC"
-        df_unidades = pd.read_sql(query, engine)
+        # --- CORREÇÃO OTIMIZADA ---
+        # 1. Lê o script original para descobrir o nome da tabela/view
+        query_original_bruta = carregar_sql('sql/extracao_realizado.sql')
+        
+        # 2. Usa uma expressão regular para encontrar o nome do objeto após a cláusula FROM
+        # Isso é mais robusto do que um simples split.
+        match = re.search(r'FROM\s+([a-zA-Z0-9_.\-\[\]]+)', query_original_bruta, re.IGNORECASE)
+        
+        if not match:
+            logger.error("Não foi possível determinar o nome da tabela/view a partir do script 'extracao_realizado.sql'.")
+            return []
+            
+        nome_tabela_view = match.group(1)
+        logger.debug(f"Nome do objeto de dados identificado: {nome_tabela_view}")
+
+        # 3. Cria e executa uma query nova, simples e rápida
+        query_unidades = f"SELECT DISTINCT UNIDADE FROM {nome_tabela_view} WHERE UNIDADE IS NOT NULL ORDER BY UNIDADE ASC"
+        
+        df_unidades = pd.read_sql(query_unidades, engine)
         unidades = df_unidades['UNIDADE'].tolist()
         logger.info(f"{len(unidades)} unidades encontradas.")
         return unidades
     except Exception as e:
-        logger.error(f"Não foi possível buscar a lista de unidades. Erro: {e}")
+        logger.error(f"Não foi possível buscar a lista de unidades. Verifique se o script 'extracao_realizado.sql' está correto e se o nome do objeto é válido. Erro: {e}")
         return []

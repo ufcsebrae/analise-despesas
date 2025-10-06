@@ -1,4 +1,4 @@
-# analise_despesa/analise/agregacao.py (VERSÃO FINAL COM RESUMO ENRIQUECIDO)
+# analise_despesa/analise/agregacao.py (VERSÃO FINAL E COMPLETA)
 
 import pandas as pd
 import numpy as np
@@ -8,7 +8,6 @@ from sklearn.ensemble import IsolationForest
 logger = logging.getLogger(__name__)
 
 def agregar_realizado_vs_orcado_por_projeto(df_integrado: pd.DataFrame, df_ocorrencias_atipicas: pd.DataFrame) -> pd.DataFrame:
-    # (Código inalterado)
     if df_integrado.empty: return pd.DataFrame()
     logger.info("Agregando Orçado vs. Realizado e calculando Score de Criticidade...")
     df_agregado = df_integrado.groupby('PROJETO').agg(VALOR_REALIZADO=('VALOR_REALIZADO', 'sum'), VALOR_ORCADO=('VALOR_ORCADO', 'sum')).reset_index()
@@ -33,7 +32,6 @@ def agregar_realizado_vs_orcado_por_projeto(df_integrado: pd.DataFrame, df_ocorr
     return df_final
 
 def agregar_despesas_por_fornecedor(df_bruto: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
-    # (Código inalterado)
     if df_bruto.empty: return pd.DataFrame()
     df_agregado = df_bruto.groupby('FORNECEDOR')['VALOR'].sum().reset_index()
     df_agregado['VALOR_ABS'] = df_agregado['VALOR'].abs()
@@ -43,7 +41,6 @@ def agregar_despesas_por_fornecedor(df_bruto: pd.DataFrame, top_n: int = 10) -> 
     return df_top.rename(columns={'FORNECEDOR': 'Fornecedor', 'VALOR': 'Realizado (Ano)'})
 
 def agregar_despesas_por_mes(df_bruto: pd.DataFrame) -> pd.DataFrame:
-    # (Código inalterado)
     if df_bruto.empty or 'tipo_projeto' not in df_bruto.columns: return pd.DataFrame()
     logger.info("Agregando despesas mensais e aplicando IA na tendência...")
     df_exclusivo = df_bruto[df_bruto['tipo_projeto'] == 'Exclusivo']
@@ -74,50 +71,28 @@ def agregar_despesas_por_mes(df_bruto: pd.DataFrame) -> pd.DataFrame:
     colunas_existentes = [col for col in colunas_finais if col in df_final.columns]
     return df_final[colunas_existentes].rename(columns={'MES': 'Mês'})
 
-# --- CORREÇÃO: ADICIONANDO NOVOS INDICADORES AO RESUMO ---
 def gerar_resumo_executivo(
     df_unidade_bruto: pd.DataFrame, 
     df_unidade_integrado: pd.DataFrame, 
     mes_referencia_num: int
 ) -> dict:
-    """Calcula todas as métricas detalhadas para o Resumo Executivo e contexto da Tabela 4."""
     logger.info("Gerando Resumo Executivo e estatísticas de referência...")
     if df_unidade_bruto.empty: return {}
-
     df_mes_bruto = df_unidade_bruto[df_unidade_bruto['MES'] == mes_referencia_num]
-    
-    # Separa por tipo de projeto
     df_bruto_exclusivo = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo']
     df_bruto_compartilhado = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Compartilhado']
     df_mes_exclusivo = df_mes_bruto[df_mes_bruto['tipo_projeto'] == 'Exclusivo']
     df_mes_compartilhado = df_mes_bruto[df_mes_bruto['tipo_projeto'] == 'Compartilhado']
-
     resumo = {
-        # Totais Gerais
-        "valor_total_mes": df_mes_bruto['VALOR'].sum(),
-        "valor_total_ano": df_unidade_bruto['VALOR'].sum(),
-        "qtd_lancamentos_mes": len(df_mes_bruto),
-        "qtd_lancamentos_ano": len(df_unidade_bruto),
-        # Novos Indicadores de Gastos
-        "gastos_mes_exclusivo": df_mes_exclusivo['VALOR'].sum(),
-        "gastos_ano_exclusivo": df_bruto_exclusivo['VALOR'].sum(),
-        "gastos_mes_compartilhado": df_mes_compartilhado['VALOR'].sum(),
-        "gastos_ano_compartilhado": df_bruto_compartilhado['VALOR'].sum(),
+        "valor_total_mes": df_mes_bruto['VALOR'].sum(), "valor_total_ano": df_unidade_bruto['VALOR'].sum(),
+        "qtd_lancamentos_mes": len(df_mes_bruto), "qtd_lancamentos_ano": len(df_unidade_bruto),
+        "gastos_mes_exclusivo": df_mes_exclusivo['VALOR'].sum(), "gastos_ano_exclusivo": df_bruto_exclusivo['VALOR'].sum(),
+        "gastos_mes_compartilhado": df_mes_compartilhado['VALOR'].sum(), "gastos_ano_compartilhado": df_bruto_compartilhado['VALOR'].sum(),
     }
-
     orc_total_ano = df_unidade_integrado['VALOR_ORCADO'].sum()
     orc_exclusivo_ano = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']['VALOR_ORCADO'].sum()
     orc_compartilhado_ano = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']['VALOR_ORCADO'].sum()
-    
-    resumo.update({
-        "orcamento_planejado_ano": orc_total_ano,
-        "orcamento_total_exclusivo": orc_exclusivo_ano,
-        "orcamento_total_compartilhado": orc_compartilhado_ano,
-        "orcamento_mes_referencia": orc_total_ano / 12 if orc_total_ano else 0,
-        "orcamento_mes_exclusivo": orc_exclusivo_ano / 12 if orc_exclusivo_ano else 0,
-        "orcamento_mes_compartilhado": orc_compartilhado_ano / 12 if orc_compartilhado_ano else 0,
-    })
-
+    resumo.update({"orcamento_planejado_ano": orc_total_ano, "orcamento_total_exclusivo": orc_exclusivo_ano, "orcamento_total_compartilhado": orc_compartilhado_ano, "orcamento_mes_referencia": orc_total_ano / 12 if orc_total_ano else 0, "orcamento_mes_exclusivo": orc_exclusivo_ano / 12 if orc_exclusivo_ano else 0, "orcamento_mes_compartilhado": orc_compartilhado_ano / 12 if orc_compartilhado_ano else 0})
     def get_stats_de_valor(df_historico_tipo, df_mes_tipo):
         stats = {}
         if not df_historico_tipo.empty:
@@ -131,11 +106,9 @@ def gerar_resumo_executivo(
                 stats["min_normal_mes"] = inliers['VALOR'].min()
                 stats["max_normal_mes"] = inliers['VALOR'].max()
         return stats
-
     stats_exclusivo = get_stats_de_valor(df_bruto_exclusivo, df_mes_exclusivo)
     for key, val in stats_exclusivo.items(): resumo[f"{key}_exclusivo"] = val
     stats_compartilhado = get_stats_de_valor(df_bruto_compartilhado, df_mes_compartilhado)
     for key, val in stats_compartilhado.items(): resumo[f"{key}_compartilhado"] = val
-
     logger.info("Resumo e estatísticas gerados com sucesso.")
     return resumo

@@ -1,4 +1,4 @@
-# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM Z-SCORE E ENGENHARIA DE FEATURES)
+# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM TODAS AS FUNÇÕES)
 import pandas as pd
 import logging
 from sklearn.ensemble import IsolationForest
@@ -14,19 +14,16 @@ def detectar_anomalias_de_contexto(df: pd.DataFrame, contamination: float = 0.03
     """
     Usa Engenharia de Features (Z-Score + Frequência) e Isolation Forest para encontrar ocorrências atípicas.
     """
-    if df.empty or len(df) < 10: # Requisito mínimo para análise estatística
+    if df.empty or len(df) < 10:
         logger.warning("Dados insuficientes para a análise de ocorrências atípicas de contexto.")
         return pd.DataFrame()
     
     logger.info("Iniciando detecção de ocorrências atípicas com Engenharia de Features e Z-Score...")
     df_analise = df.copy()
 
-    # --- ENGENHARIA DE FEATURES AVANÇADA ---
-    # 1. Calcula a frequência (familiaridade) de cada Fornecedor e Projeto
     df_analise['FREQ_FORNECEDOR'] = df_analise.groupby('FORNECEDOR')['FORNECEDOR'].transform('count')
     df_analise['FREQ_PROJETO'] = df_analise.groupby('PROJETO')['PROJETO'].transform('count')
 
-    # 2. Calcula o Z-Score do VALOR dentro de cada grupo (Fornecedor, Projeto)
     group_stats = df_analise.groupby(['FORNECEDOR', 'PROJETO'])['VALOR'].agg(['mean', 'std']).reset_index()
     df_analise = pd.merge(df_analise, group_stats, on=['FORNECEDOR', 'PROJETO'], how='left')
     
@@ -34,14 +31,11 @@ def detectar_anomalias_de_contexto(df: pd.DataFrame, contamination: float = 0.03
     df_analise['Z_SCORE_VALOR'] = np.where(df_analise['std'] > 0, (df_analise['VALOR'] - df_analise['mean']) / df_analise['std'], 0)
     df_analise['Z_SCORE_VALOR'] = df_analise['Z_SCORE_VALOR'].fillna(0)
 
-    # 3. Define as features que a IA irá analisar
     features_para_analise = ['Z_SCORE_VALOR', 'FREQ_FORNECEDOR', 'FREQ_PROJETO']
     
-    # 4. Normaliza os dados
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(df_analise[features_para_analise])
 
-    # 5. Treina o modelo com as novas features inteligentes
     modelo_ia = IsolationForest(contamination=contamination, random_state=42)
     df_analise['ocorrencia_contexto'] = modelo_ia.fit_predict(features_scaled)
     
@@ -87,7 +81,6 @@ def investigar_causa_raiz_ocorrencia(df_ocorrencias: pd.DataFrame, df_historico_
     return df_investigado
 
 def segmentar_contas_por_comportamento(df_a_segmentar: pd.DataFrame, n_clusters: int = 3) -> Tuple[Dict[str, pd.DataFrame], Dict[str, Dict[str, Any]]]:
-    # (Código inalterado)
     logger.info(f"Iniciando segmentação de contas contábeis (Nível 4) com {n_clusters} clusters...")
     if df_a_segmentar.empty or 'DESC_NIVEL_4' not in df_a_segmentar.columns:
         logger.warning("DataFrame para segmentação vazio ou sem 'DESC_NIVEL_4'.")
@@ -113,16 +106,14 @@ def segmentar_contas_por_comportamento(df_a_segmentar: pd.DataFrame, n_clusters:
     df_scaled = pd.DataFrame(scaler.fit_transform(df_comportamento[features_para_cluster]), columns=features_para_cluster, index=df_comportamento.index)
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
     df_comportamento['cluster'] = kmeans.fit_predict(df_scaled)
-    clusters_tabelas = {}
-    clusters_resumo = {}
+    clusters_tabelas, clusters_resumo = {}, {}
     centroids = df_comportamento.groupby('cluster')[features_para_cluster].mean()
     prioridade = centroids.sort_values(by=['coef_variacao', 'frequencia', 'valor_total'], ascending=[False, False, False]).index
     nomes_usados = []
     perfil_counter = 1
     for cluster_id in prioridade:
         centroid_data = centroids.loc[cluster_id].to_dict()
-        name = f"Perfil {perfil_counter}: "
-        description = ""
+        name, description = f"Perfil {perfil_counter}: ", ""
         if centroid_data['coef_variacao'] > 0.8 and 'Eventos Esporádicos' not in nomes_usados:
             name += "Contas de Eventos Esporádicos e Variáveis"
             description = "Contas com alta imprevisibilidade nos valores mensais, indicando pagamentos pontuais ou projetos sazonais (Ex: Consultorias, Manutenções não planejadas)."

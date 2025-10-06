@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL COM DESEMPACOTAMENTO DO RESUMO)
+# main.py (VERSÃO FINAL COM FILTRO PARA PROJETOS EXCLUSIVOS NA TABELA 4)
 
 import logging
 import datetime
@@ -7,7 +7,7 @@ from analise_despesa.logging_config import setup_logging
 from analise_despesa.extracao import buscar_dados_realizado, buscar_dados_orcamento
 from analise_despesa.analise import agregacao, insights_ia
 from analise_despesa.comunicacao import email
-from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO
+from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, MES_ANALISE_SOBRESCRITA
 from analise_despesa.processamento import enriquecimento
 
 setup_logging()
@@ -31,19 +31,20 @@ def executar_analise_distribuida():
         df_integrado = pd.merge(df_real_agg, df_orcado_anual, left_on='CODCCUSTO_JUNCAO', right_on='CODCCUSTO', how='left', suffixes=('', '_orcado'))
         df_integrado['VALOR_ORCADO'] = df_integrado['VALOR_ORCADO'].fillna(0)
         df_integrado.drop(columns=['CODCCUSTO'], inplace=True, errors='ignore')
-        
-        df_folha_bruto_global = df_realizado_enriquecido[df_realizado_enriquecido['PROJETO'].isin(PROJETOS_FOLHA_PAGAMENTO)].copy()
-        if not df_folha_bruto_global.empty:
-            df_folha_bruto_global['COD_UNIDADE'] = df_folha_bruto_global['CC'].str[-3:]
 
     except Exception as e:
         logger.critical(f"❌ Falha na carga/integração inicial. Erro: {e}", exc_info=True)
         return
 
+    df_analise_principal = df_realizado_enriquecido.copy()
+    if MES_ANALISE_SOBRESCRITA:
+        logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {MES_ANALISE_SOBRESCRITA}. ")
+        df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= MES_ANALISE_SOBRESCRITA].copy()
+
     for unidade, email_gestor in MAPA_GESTORES.items():
         logger.info(f"================== PROCESSANDO UNIDADE: {unidade} ==================")
         try:
-            df_unidade_bruto = df_realizado_enriquecido[df_realizado_enriquecido['UNIDADE'].str.strip() == unidade].copy()
+            df_unidade_bruto = df_analise_principal[df_analise_principal['UNIDADE'].str.strip() == unidade].copy()
             if df_unidade_bruto.empty: continue
             df_unidade_integrado = df_integrado[df_integrado['UNIDADE'].str.strip() == unidade].copy()
             
@@ -51,23 +52,20 @@ def executar_analise_distribuida():
             if not df_unidade_bruto.empty:
                 cod_unidade_analisada = df_unidade_bruto['CC'].str[-3:].iloc[0]
             
-            resumo = agregacao.gerar_resumo_executivo(df_unidade_bruto, df_unidade_integrado, df_unidade_bruto['MES'].max())
+            mes_referencia_num = df_unidade_bruto['MES'].max()
+            resumo = agregacao.gerar_resumo_executivo(df_unidade_bruto, df_unidade_integrado, mes_referencia_num)
             resumo['numero_unidade'] = cod_unidade_analisada
             
-            df_clusters_folha, resumo_clusters_folha = {}, {}
-            if not df_folha_bruto_global.empty:
-                df_folha_unidade = df_folha_bruto_global[df_folha_bruto_global['COD_UNIDADE'] == cod_unidade_analisada]
-                if not df_folha_unidade.empty:
-                    df_clusters_folha, resumo_clusters_folha = insights_ia.segmentar_contas_por_comportamento(df_folha_unidade)
-                else:
-                    logger.warning(f"Nenhum dado de folha de pagamento encontrado para o código de unidade '{cod_unidade_analisada}'.")
+            df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
+            df_clusters, resumo_clusters = {}, {}
+            if not df_unidade_exclusivos.empty:
+                df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
 
             df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
             df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
             
-            mes_referencia_num = df_unidade_bruto['MES'].max()
-            df_mes_bruto = df_unidade_bruto[df_unidade_bruto['MES'] == mes_referencia_num]
-            df_ocorrencias_atipicas = insights_ia.detectar_anomalias_de_contexto(df_mes_bruto)
+            # --- CORREÇÃO: DETECÇÃO DE OCORRÊNCIAS APENAS EM PROJETOS EXCLUSIVOS ---
+            df_ocorrencias_atipicas = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
             
             df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas)
             df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_compartilhado, df_ocorrencias_atipicas)
@@ -86,7 +84,7 @@ def executar_analise_distribuida():
                 df_orcamento_exclusivo=df_orcamento_exclusivo, df_orcamento_compartilhado=df_orcamento_compartilhado,
                 df_fornecedores_exclusivo=df_fornecedores_exclusivo, df_fornecedores_compartilhado=df_fornecedores_compartilhado,
                 df_mes_agregado=df_mes_agregado, df_ocorrencias_atipicas=df_ocorrencias_investigadas,
-                df_clusters_folha=df_clusters_folha, resumo_clusters_folha=resumo_clusters_folha
+                df_clusters_folha=df_clusters, resumo_clusters_folha=resumo_clusters
             )
             assunto = f"Análise de Despesas - {unidade} - Ref {resumo['mes_referencia']}/{ano}"
             email.enviar_email_via_smtp(assunto, corpo_html, email_gestor)

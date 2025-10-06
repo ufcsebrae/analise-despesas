@@ -1,4 +1,4 @@
-# analise_despesa/comunicacao/email.py (SEM ALTERAÇÕES, APENAS RECONFIRMANDO)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM NOVAS LINHAS NO RESUMO)
 
 import pandas as pd
 import logging, os, smtplib
@@ -34,8 +34,11 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
         if pd.isna(value): return "N/A"
         return f"{value:.0%}"
 
+    # --- CORREÇÃO: Adicionando as novas linhas de gastos ---
     itens_resumo = [
         {"indicador": "Total Gasto (Realizado)", "mes": robust_currency_formatter(resumo.get("valor_total_mes")), "ano": robust_currency_formatter(resumo.get("valor_total_ano"))},
+        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas exclusivas", "mes": robust_currency_formatter(resumo.get("gastos_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("gastos_ano_exclusivo"))},
+        {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas compartilhadas", "mes": robust_currency_formatter(resumo.get("gastos_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("gastos_ano_compartilhado"))},
         {"indicador": "Orçamento Planejado (a+b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_referencia")), "ano": robust_currency_formatter(resumo.get("orcamento_planejado_ano"))},
         {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas exclusivas (a)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("orcamento_total_exclusivo"))},
         {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas compartilhadas (b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("orcamento_total_compartilhado"))},
@@ -43,6 +46,7 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
     ]
 
     resumo_formatado = {
+        # (código inalterado)
         "numero_unidade": resumo.get("numero_unidade"), "mes_referencia": resumo.get("mes_referencia"),
         "valor_mediano_mes_exclusivo": robust_currency_formatter(resumo.get("valor_mediano_mes_exclusivo")),
         "min_normal_mes_exclusivo": robust_currency_formatter(resumo.get("min_normal_mes_exclusivo")), "max_normal_mes_exclusivo": robust_currency_formatter(resumo.get("max_normal_mes_exclusivo")),
@@ -54,21 +58,14 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
         "maior_ano_compartilhado": robust_currency_formatter(resumo.get("maior_ano_compartilhado")), "menor_ano_compartilhado": robust_currency_formatter(resumo.get("menor_ano_compartilhado")),
     }
     
-    resumo_clusters_formatado = {}
-    for name, data in resumo_clusters_folha.items():
-        resumo_clusters_formatado[name] = {
-            'valor_total': robust_currency_formatter(data.get('valor_total')),
-            'frequencia': robust_int_formatter(data.get('frequencia')),
-            'volatilidade_mensal': robust_currency_formatter(data.get('volatilidade_mensal')),
-            'description': data.get('description', 'Descrição não disponível.')
-        }
+    resumo_clusters_formatado = {name: {'valor_total': robust_currency_formatter(data.get('valor_total')), 'frequencia': robust_int_formatter(data.get('frequencia')), 'coef_variacao': robust_percent_formatter(data.get('coef_variacao')), 'description': data.get('description', 'Descrição não disponível.')} for name, data in resumo_clusters_folha.items()}
 
     formatters = {
         'projeto': {'Criticidade': lambda x: x, 'Orçado': robust_currency_formatter, 'Realizado': robust_currency_formatter, '% Execução': robust_percent_formatter},
         'fornecedor': {'Realizado (Ano)': robust_currency_formatter},
         'ocorrencia': {'Realizado': robust_currency_formatter, 'Justificativa IA': lambda x: x},
-        'mes': {'Realizado (Exclusivo)': robust_currency_formatter, 'Acumulado (Exclusivo)': robust_currency_formatter, 'Realizado (Compartilhado)': robust_currency_formatter, 'Acumulado (Compartilhado)': robust_currency_formatter},
-        'folha_cluster': {'Agrupamento Contábil (Nível 4)': lambda x: x, 'Valor Total (Ano)': robust_currency_formatter, 'Qtd. Lançamentos (Ano)': robust_int_formatter, 'Volatilidade Mensal (R$)': robust_currency_formatter}
+        'mes': {'Mês': lambda x: x, 'Realizado (Exclusivo)': robust_currency_formatter, 'Realizado (Compartilhado)': robust_currency_formatter, 'Sinalização da IA': lambda x: x},
+        'folha_cluster': {'Agrupamento Contábil (Nível 4)': lambda x: x, 'Valor Total (Ano)': robust_currency_formatter, 'Qtd. Lançamentos (Ano)': robust_int_formatter, 'Coeficiente de Variação (CV)': robust_percent_formatter}
     }
     tabelas_html = {
         'tabela_orc_exclusivo': df_orcamento_exclusivo.to_html(index=False, na_rep='N/A', classes='table', formatters=formatters['projeto']),

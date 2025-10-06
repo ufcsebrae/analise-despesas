@@ -36,7 +36,11 @@
             <p>Eu sou seu assistente de análise de dados. Meu trabalho é processar milhares de lançamentos financeiros e transformá-los em informações claras e acionáveis para apoiar sua gestão. Este relatório foi preparado por mim e destaca os pontos mais importantes sobre as despesas da sua unidade.</p>
             <p><strong>Conceitos e Modelos de IA Utilizados:</strong></p>
             <ul>
-                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. Projetos "Compartilhados" têm despesas que podem ser rateadas entre múltiplas unidades.</li>
+                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> </li>
+                    <ul>
+                        <li>Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. </li>
+                        <li>Projetos "Compartilhados" têm despesas que podem ser rateadas entre múltiplas unidades.</li>
+                    </ul>
                 <li>
                     <strong>Sinalização da IA na Tendência Mensal (Tabela 2):</strong> O robô analisa o ritmo dos seus gastos totais ao longo do ano. Se um mês tem um pico ou queda muito brusca em comparação com o padrão, ele sinaliza como "Pico Atípico" ou "Redução Atípica".
                 </li>
@@ -102,14 +106,16 @@
         {% endif %}
         
         <h2>4. Ocorrências Atípicas de Contexto em Projetos Exclusivos</h2>
-        <p class="section-intro">
+        <div class="section-intro">
             <strong>Metodologia Técnica Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
             A IA agora age como um auditor estatístico, avaliando cada transação em três dimensões:<br>
-            <strong>1. Anomalia de Valor (Z-Score):</strong> O robô calcula a média e o desvio padrão dos gastos para <i>cada</i> combinação específica de Fornecedor-Projeto. Ele então mede quão longe (em desvios padrão) o valor do lançamento atual está da média do seu próprio grupo. Um Z-Score alto indica uma variação de valor estatisticamente significativa.<br>
-            <strong>2. Familiaridade do Fornecedor:</strong> O robô mede a frequência de atividade do fornecedor na sua unidade durante o ano.<br>
-            <strong>3. Familiaridade do Projeto:</strong> O robô mede a frequência de lançamentos no projeto.<br><br>
+                <ul>
+                    <li><strong>Anomalia de Valor (Z-Score):</strong> O robô calcula a média e o desvio padrão dos gastos para <i>cada</i> combinação específica de Fornecedor-Projeto. Ele então mede quão longe (em desvios padrão) o valor do lançamento atual está da média do seu próprio grupo. Um Z-Score alto indica uma variação de valor estatisticamente significativa.<br></li>
+                    <li><strong>Familiaridade do Fornecedor:</strong> O robô mede a frequência de atividade do fornecedor na sua unidade durante o ano.<br></li>
+                    <li><strong>Familiaridade do Projeto:</strong> O robô mede a frequência de lançamentos no projeto.<br><br></li>
+                </ul>
             O modelo `IsolationForest` é treinado com essas três métricas inteligentes. Ele sinaliza ocorrências onde a combinação desses fatores é rara, focando em eventos genuinamente incomuns e eliminando "falsos positivos" de variações normais de valor. A coluna <strong>'Justificativa IA'</strong> explica o porquê.
-        </p>
+        </div>
         {% if tem_ocorrencias_atipicas %}
             {{ tabela_ocorrencias_atipicas | safe }}
         {% else %}

@@ -1,9 +1,9 @@
-<!-- relatorio_analise.html (VERSÃO FINAL COM TEXTOS EXPLICATIVOS MELHORADOS) -->
+<!-- relatorio_analise.html (VERSÃO FINAL COMPLETA E CORRIGIDA) -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Análise de Despesas por Classificação</title>
+    <title>Análise de Despesas</title>
     <style>
         body { font-family: 'Calibri', 'Segoe UI', sans-serif; color: #1f497d; line-height: 1.5; }
         .container { max-width: 950px; margin: auto; padding: 20px; }
@@ -16,76 +16,114 @@
         th { background-color: #f2f7ff; font-weight: bold; }
         tr:nth-child(even) { background-color: #f8faff; }
         .section-intro { font-size: 15px; color: #333; background-color: #f8faff; padding: 15px; border-left: 5px solid #5b9bd5; margin-bottom: 20px; }
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 25px; background-color: #f2f7ff; padding: 20px; border-radius: 5px; margin-bottom: 30px;}
-        .summary-label { font-weight: bold; color: #335b8a; }
+        .summary-table th { text-align: left; }
+        .summary-table td:nth-child(2), .summary-table td:nth-child(3) { text-align: right; }
         .footer { text-align: center; color: #888; margin-top: 50px; }
+        table tr:last-child { font-weight: bold; background-color: #eaf1fa; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Relatório Consolidado de Despesas</h1>
-        <p style="text-align: center;"><strong>Unidade:</strong> {{ unidade_gestora }} ({{ resumo.numero_unidade }}) | <strong>Data:</strong> {{ data_relatorio }}</p>
+        <h1>Relatório de Análise de Despesas</h1>
+        <p style="text-align: center;">
+            <strong>Unidade:</strong> {{ unidade_gestora }} ({{ resumo.numero_unidade }}) | 
+            <strong>Mês de Referência:</strong> {{ resumo.mes_referencia }} | 
+            <strong>Data de Emissão:</strong> {{ data_relatorio }}
+        </p>
 
         <h2>Resumo Executivo</h2>
-        <div class="summary-grid">
-            <div class="summary-item"><span class="summary-label">Mês de Referência:</span> {{ resumo.mes_referencia }}</div>
-            <div class="summary-item"><span class="summary-label">Ano de Referência:</span> {{ data_relatorio.split('/')[-1] }}</div>
-            <div class="summary-item"><span class="summary-label">Total Gasto (Mês):</span> {{ resumo.valor_total_mes }}</div>
-            <div class="summary-item"><span class="summary-label">Total Gasto (Ano):</span> {{ resumo.valor_total_ano }}</div>
-            <div class="summary-item"><span class="summary-label">Lançamentos (Mês):</span> {{ resumo.qtd_lancamentos_mes }}</div>
-            <div class="summary-item"><span class="summary-label">Lançamentos (Ano):</span> {{ resumo.qtd_lancamentos_ano }}</div>
-            <div class="summary-item" style="grid-column: 1 / -1;"><span class="summary-label">Principal Fornecedor (Projetos Exclusivos):</span> {{ resumo.principal_fornecedor_ano }} ({{ resumo.valor_principal_fornecedor_ano }})</div>
-        </div>
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Indicador</th>
+                    <th style="text-align: right;">Mês</th>
+                    <th style="text-align: right;">Ano</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in itens_resumo %}
+                <tr>
+                    <td>{{ item.indicador | safe }}</td>
+                    <td>{{ item.mes }}</td>
+                    <td>{{ item.ano }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
         <h2>1. Execução Orçamentária (Ano)</h2>
-        <p class="section-intro">Aqui, a gente compara o que foi planejado (Orçado) com o que foi realmente gasto (Realizado). A coluna '% Execução' é um termômetro que mostra o quão perto estamos de usar todo o orçamento do ano para cada projeto.</p>
+        <p class="section-intro">
+            Comparamos o planejado (Orçado) com o gasto (Realizado). A coluna <strong>'Criticidade'</strong> age como um termômetro de risco para cada projeto, combinando a execução do orçamento com a ocorrência de ocorrências atípicas no mês:<br>
+            <strong>↑ Alto:</strong> Execução do orçamento acima de 90%, ou acima de 75% com ocorrências atípicas detectadas.<br>
+            <strong>→ Médio:</strong> Execução acima de 75%, ou qualquer projeto com ocorrências atípicas.<br>
+            <strong>↓ Baixo:</strong> Projetos dentro da normalidade e com orçamento sob controle.
+        </p>
         {% if tem_exclusivos %}
-            <h3>1.A: Projetos 100% da Unidade</h3>
+            <h3>1.A: Iniciativas exclusivas</h3>
             {{ tabela_orc_exclusivo | safe }}
         {% endif %}
         {% if tem_compartilhados %}
-            <h3>1.B: Projetos Compartilhados com outras Unidades</h3>
+            <h3>1.B: Iniciativas compartilhadas</h3>
             {{ tabela_orc_compartilhado | safe }}
         {% endif %}
 
-        <h2>2. Top 5 Fornecedores (Ano)</h2>
-        <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade ao longo do ano. Isso ajuda a entender quem são nossos parceiros mais importantes e onde os gastos estão concentrados.</p>
+        <h2>2. Desempenho Mensal (Ano)</h2>
+        <p class="section-intro">Como nossos gastos se comportaram mês a mês? Esta tabela mostra o ritmo das despesas ao longo do ano.</p>
+        {{ tabela_mes_agregado | safe }}
+
+        <h2>3. Top 5 Fornecedores (Ano)</h2>
+        <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade.</p>
         {% if tem_exclusivos %}
-            <h3>2.A: Fornecedores de Projetos Exclusivos</h3>
+            <h3>3.A: Fornecedores de Iniciativas exclusivas</h3>
             {{ tabela_forn_exclusivo | safe }}
         {% endif %}
         {% if tem_compartilhados %}
-            <h3>2.B: Fornecedores de Projetos Compartilhados</h3>
+            <h3>3.B: Fornecedores de Iniciativas compartilhadas</h3>
             {{ tabela_forn_compartilhado | safe }}
         {% endif %}
-
-        <h2>3. Desempenho Mensal (Ano)</h2>
-        <p class="section-intro">Como nossos gastos se comportaram mês a mês? Esta tabela mostra o ritmo das despesas ao longo do ano. A coluna 'Valor' mostra o gasto de cada mês, e a 'Acumulado' vai somando tudo, pra gente ver o total gasto até aquele ponto.</p>
-        {{ tabela_mes_agregado | safe }}
-
-        <h2>4. Detecção de Lançamentos Atípicos (Mês de Referência)</h2>
-        <!-- TEXTO DE ANOMALIAS RESTAURADO E MELHORADO -->
-        <p class="section-intro">
-            <strong>Metodologia Técnica Aplicada:</strong><br>
-            As transações abaixo foram destacadas por um modelo de inteligência artificial chamado <strong>Isolation Forest</strong>. Pense nele como um detetive que é especialista em achar "o estranho no ninho". Ele analisa todos os gastos do mês e aponta aqueles que são muito diferentes do padrão normal, seja por serem muito altos ou muito baixos.<br><br>
-            <strong>Qual o padrão deste mês? Para o robô, o valor mais comum (mediano) dos gastos normais em <u>{{ resumo.mes_referencia }}</u> foi de:</strong><br>
-            <strong style="font-size: 18px; color: #005691;">{{ resumo.valor_mediano_regular_mes }}</strong><br><br>
-            Os lançamentos listados abaixo, por destoarem bastante desse padrão, merecem sua atenção. Eles não são necessariamente erros, mas são pontos que vale a pena validar.<br>
-            <br><i>Para contexto, estes são os valores de referência do <strong>ano inteiro</strong> para a sua unidade: Média de Gasto: {{ resumo.media_lancamento_ano }} | Gasto Mediano: {{ resumo.mediana_lancamento_ano }} | Maior Gasto: {{ resumo.maior_lancamento_ano }} | Maior Crédito/Devolução: {{ resumo.menor_lancamento_ano }}</i>
-        </p>
-        {% if tem_anomalias_exclusivas %}
-            <h3>4.A: Anomalias em Projetos Exclusivos</h3>
-            {{ tabela_anom_exclusivo | safe }}
-        {% else %}
-            <p><strong>Projetos Exclusivos:</strong> Nenhum lançamento atípico foi detectado para o mês de referência.</p>
-        {% endif %}
-        {% if tem_anomalias_compartilhadas %}
-            <h3>4.B: Anomalias em Projetos Compartilhados</h3>
-            {{ tabela_anom_compartilhado | safe }}
-        {% else %}
-            <p><strong>Projetos Compartilhados:</strong> Nenhum lançamento atípico foi detectado para o mês de referência.</p>
-        {% endif %}
         
+        <h2>4. Ocorrências Atípicas de Contexto (Mês de Referência)</h2>
+        <p class="section-intro">
+            <strong>Metodologia Técnica Aplicada (IA Avançada):</strong><br>
+            A IA (Isolation Forest) foi treinada para aprender as combinações "normais" entre <strong>Fornecedor, Projeto e Valor</strong>. As transações listadas abaixo são combinações que o robô achou muito raras ou inéditas. A coluna <strong>'Justificativa IA'</strong> age como um detetive, explicando o motivo da suspeita.
+        </p>
+        {% if tem_contexto_exclusivo %}
+        <p class="section-intro">
+            <strong>Ênfase do Modelo (Iniciativas Exclusivas):</strong> Para o robô, o valor mais comum (mediano) dos gastos em projetos exclusivos neste mês foi de <strong style="color: #005691;">{{ resumo.valor_mediano_mes_exclusivo }}</strong>. A maioria dos gastos "normais" (os inliers) esteve na faixa de <strong style="color: #005691;">{{ resumo.min_normal_mes_exclusivo }}</strong> até <strong style="color: #005691;">{{ resumo.max_normal_mes_exclusivo }}</strong>. As ocorrências abaixo podem ter sido apontadas por fugirem deste padrão de valor ou por terem uma combinação de fornecedor/projeto incomum.<br><br>
+            <small><i><strong>Contexto do Ano (Exclusivos):</strong> Média: {{ resumo.media_ano_exclusivo }} | Mediana: {{ resumo.mediana_ano_exclusivo }} | Max: {{ resumo.maior_ano_exclusivo }} | Min: {{ resumo.menor_ano_exclusivo }}</i></small>
+        </p>
+        {% endif %}
+        {% if tem_contexto_compartilhado %}
+        <p class="section-intro">
+            <strong>Ênfase do Modelo (Iniciativas Compartilhadas):</strong> O valor mediano dos gastos em projetos compartilhados neste mês foi de <strong style="color: #005691;">{{ resumo.valor_mediano_mes_compartilhado }}</strong>. A maioria dos gastos "normais" esteve na faixa de <strong style="color: #005691;">{{ resumo.min_normal_mes_compartilhado }}</strong> até <strong style="color: #005691;">{{ resumo.max_normal_mes_compartilhado }}</strong>.<br><br>
+            <small><i><strong>Contexto do Ano (Compartilhados):</strong> Média: {{ resumo.media_ano_compartilhado }} | Mediana: {{ resumo.mediana_ano_compartilhado }} | Max: {{ resumo.maior_ano_compartilhado }} | Min: {{ resumo.menor_ano_compartilhado }}</i></small>
+        </p>
+        {% endif %}
+        {% if tem_ocorrencias_atipicas %}
+            {{ tabela_ocorrencias_atipicas | safe }}
+        {% else %}
+            <p>Nenhuma ocorrência atípica de contexto foi detectada para o mês de referência.</p>
+        {% endif %}
+
+        <h2>5. Análise de Comportamento: Contas da Folha de Pagamento (IA)</h2>
+        <p class="section-intro">
+            <strong>Metodologia Técnica Aplicada (K-Means Clustering):</strong><br>
+            Esta análise utiliza Inteligência Artificial para agrupar as contas contábeis dos projetos de folha de pagamento da <strong>sua unidade</strong> com base em seu "DNA" financeiro: <strong>Valor Total, Frequência e Volatilidade Mensal</strong>. O robô identifica padrões de comportamento e organiza as contas em diferentes perfis.
+        </p>
+        {% if tem_clusters_folha %}
+            {% for nome_cluster, tabela_html_cluster in clusters_folha.items() %}
+                <h3>5.{{ loop.index }}: {{ nome_cluster }}</h3>
+                <p class="section-intro">
+                    <strong>Interpretação do Perfil:</strong> {{ resumo_clusters_folha[nome_cluster].description }}<br><br>
+                    <strong>Ênfase do Perfil (Valores Médios do Grupo):</strong><br>
+                    As contas neste grupo tiveram, em média, um <strong>valor total</strong> de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].valor_total }}</strong>, distribuído em aproximadamente <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].frequencia }}</strong> lançamentos durante o ano, com uma <strong>volatilidade mensal</strong> (variação de gastos) de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].volatilidade_mensal }}</strong>.
+                </p>
+                {{ tabela_html_cluster | safe }}
+            {% endfor %}
+        {% else %}
+            <p>Não foi possível gerar a análise de comportamento para as contas da folha de pagamento desta unidade (verifique se há dados suficientes para os projetos de folha e se a coluna 'DESC_CONTA' está disponível).</p>
+        {% endif %}
+
         <p class="footer">Este é um relatório gerado automaticamente pelo Sistema de Análise de Despesas.</p>
     </div>
 </body>

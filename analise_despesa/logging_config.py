@@ -9,7 +9,7 @@ def setup_logging():
     
     # Define o nível de log para DEBUG para capturar mais detalhes, se necessário.
     # Em produção, você pode mudar para logging.INFO.
-    log_level = logging.INFO 
+    log_level = logging.DEBUG 
 
     logging.basicConfig(
         level=log_level,

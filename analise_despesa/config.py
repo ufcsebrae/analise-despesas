@@ -28,9 +28,18 @@ PROJETOS_A_IGNORAR_ANOMALIAS: List[str] = [
     "Contrato de Temporários"
 ]
 
+# --- ATUALIZADO: PROJETOS CONSIDERADOS FOLHA DE PAGAMENTO ---
+PROJETOS_FOLHA_PAGAMENTO: List[str] = [
+    "Suporte a Negócios - Remuneração de Recursos Humanos Relacionado a Negócios",
+    "Gestão Operacional - Remuneração de Recursos Humanos - Custeio Administrativo",
+]
+
+
 # --- 4. MAPEAMENTO DE GESTORES (NÃO SÃO SEGREDOS) ---
 MAPA_GESTORES: Dict[str, str] = {
-    "SP - Cultura Empreendedora": "cesargl@sebraesp.com.br"
+    "SP - Finanças e Controladoria": "cesargl@sebraesp.com.br",
+    "SP - Cultura Empreendedora": "brunoo@sebraesp.com.br",
+    "SP - Administração": "cesargl@sebraesp.com.br"
 }
 
 # --- 5. CONFIGURAÇÕES DE CONEXÃO (LÊ OS SEGREDOS DO .env) ---

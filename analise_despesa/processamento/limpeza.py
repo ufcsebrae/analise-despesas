@@ -10,7 +10,7 @@ def tratar_dados_nulos(df: pd.DataFrame) -> pd.DataFrame:
     # Faz uma cópia para evitar SettingWithCopyWarning
     df_limpo = df.copy()
     
-    colunas_para_tratar = ['FORNECEDOR', 'CLASSIFICA', 'PROJETO', 'ACAO']
+    colunas_para_tratar = ['FORNECEDOR', 'PROJETO', 'ACAO']
     for coluna in colunas_para_tratar:
         if coluna in df_limpo.columns:
             # Preenche nulos com um valor padrão claro

@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL COM ANÁLISE DE CLUSTER LOCAL)
+# main.py (VERSÃO FINAL REESCRITA E CORRIGIDA)
 
 import logging
 import datetime
@@ -8,7 +8,7 @@ import re
 from analise_despesa.logging_config import setup_logging
 from analise_despesa.extracao import buscar_dados_realizado, buscar_dados_orcamento, buscar_unidades_disponiveis
 from analise_despesa.analise import agregacao, insights_ia
-from analise_despesa.comunicacao import email
+from analise_despesa.comunicacao import email, apresentacao
 from analise_despesa.config import PARAMETROS_ANALISE, MAPA_GESTORES, PROJETOS_FOLHA_PAGAMENTO, OUTPUT_DIR
 from analise_despesa.processamento import enriquecimento
 import os
@@ -17,7 +17,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 def obter_parametros_interativos():
-    # (Código inalterado)
+    # (Seu código original, que está perfeito, permanece aqui)
     if not sys.stdout.isatty():
         logger.info("Terminal não interativo detectado. Pulando para o modo automático.")
         return None, None, [], ""
@@ -61,7 +61,6 @@ def obter_parametros_interativos():
         return None, None, None, None
 
 def slugify(text):
-    # (Código inalterado)
     text = str(text).lower().replace(' ', '_')
     text = text.replace('ç', 'c').replace('ã', 'a').replace('á', 'a').replace('à', 'a').replace('â', 'a')
     text = text.replace('é', 'e').replace('ê', 'e').replace('í', 'i')
@@ -72,12 +71,14 @@ def executar_analise_distribuida():
     ano_interativo, mes_interativo, unidades_selecionadas, email_destino = obter_parametros_interativos()
     if ano_interativo is None and mes_interativo is None and not unidades_selecionadas and not email_destino: pass
     elif unidades_selecionadas is None: return
+
     if unidades_selecionadas:
         logger.info(f"--- MODO INTERATIVO ATIVADO ---")
         mapa_execucao = {unidade: email_destino for unidade in unidades_selecionadas}
     else:
         logger.info(f"--- MODO AUTOMÁTICO ATIVADO ---")
         mapa_execucao = MAPA_GESTORES
+
     logger.info("🚀 Iniciando pipeline completo...")
     try:
         ano = ano_interativo if ano_interativo is not None else PARAMETROS_ANALISE["ANO_REFERENCIA"]
@@ -95,13 +96,24 @@ def executar_analise_distribuida():
         df_integrado = pd.merge(df_real_agg, df_orcado_anual, left_on='CODCCUSTO_JUNCAO', right_on='CODCCUSTO', how='left', suffixes=('', '_orcado'))
         df_integrado['VALOR_ORCADO'] = df_integrado['VALOR_ORCADO'].fillna(0)
         df_integrado.drop(columns=['CODCCUSTO'], inplace=True, errors='ignore')
+
         df_analise_principal = df_realizado_enriquecido.copy()
         if mes_interativo:
             logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {mes_interativo}. ")
             df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= mes_interativo].copy()
+
     except Exception as e:
         logger.critical(f"❌ Falha na carga/integração inicial. Erro: {e}", exc_info=True)
         return
+
+    # --- GERAÇÃO DA APRESENTAÇÃO FEITA UMA ÚNICA VEZ ---
+    caminho_pptx = OUTPUT_DIR / "Documentacao_Metodologia_Robo_Despesas.pptx"
+    try:
+        apresentacao.gerar_pptx_metodologia(str(caminho_pptx))
+    except Exception as e:
+        logger.critical(f"❌ Falha ao gerar a apresentação da metodologia. O processo continuará sem este anexo. Erro: {e}")
+        caminho_pptx = None
+
     for unidade, email_gestor_final in mapa_execucao.items():
         logger.info(f"================== PROCESSANDO UNIDADE: {unidade} ==================")
         try:
@@ -110,19 +122,20 @@ def executar_analise_distribuida():
                 logger.warning(f"Nenhum dado encontrado para a unidade '{unidade}' no período selecionado. Pulando.")
                 continue
             df_unidade_integrado = df_integrado[df_integrado['UNIDADE'].str.strip() == unidade].copy()
+            
             cod_unidade_analisada = "N/A"
             if not df_unidade_bruto.empty:
                 cod_unidade_analisada = df_unidade_bruto['CC'].str[-3:].iloc[0]
+            
             mes_referencia_num = df_unidade_bruto['MES'].max()
             resumo = agregacao.gerar_resumo_executivo(df_unidade_bruto, df_unidade_integrado, mes_referencia_num)
             resumo['numero_unidade'] = cod_unidade_analisada
             
-            # --- CORREÇÃO: ANÁLISE DE CLUSTER MOVIDA PARA DENTRO DO LOOP ---
             df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
             df_clusters, resumo_clusters = {}, {}
             if not df_unidade_exclusivos.empty:
                 df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
-
+            
             df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
             df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
             
@@ -146,15 +159,23 @@ def executar_analise_distribuida():
             assunto = f"Análise de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
             unidade_para_arquivo = slugify(unidade_para_assunto)
             nome_arquivo_csv = f"despesa_{ano}{resumo['mes_referencia']}_{unidade_para_arquivo}.csv"
-            caminho_anexo = OUTPUT_DIR / nome_arquivo_csv
+            caminho_anexo_csv = OUTPUT_DIR / nome_arquivo_csv
             
-            logger.info(f"Gerando arquivo de despesas para anexo em: {caminho_anexo}")
-            df_unidade_bruto.to_csv(caminho_anexo, index=False, sep=';', encoding='utf-8-sig')
+            logger.info(f"Gerando arquivo de despesas para anexo em: {caminho_anexo_csv}")
+            df_unidade_bruto.to_csv(caminho_anexo_csv, index=False, sep=';', encoding='utf-8-sig')
             
-            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor_final, caminho_anexo=str(caminho_anexo))
-            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo para '{email_gestor_final}'.")
+            # --- CRIAÇÃO DA LISTA DE ANEXOS ---
+            anexos_a_enviar = [str(caminho_anexo_csv)]
+            if caminho_pptx and os.path.exists(caminho_pptx):
+                anexos_a_enviar.append(str(caminho_pptx))
+            
+            # --- ENVIO DO E-MAIL COM MÚLTIPLOS ANEXOS ---
+            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor_final, caminhos_anexos=anexos_a_enviar)
+            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo(s) para '{email_gestor_final}'.")
+            
         except Exception as e:
             logger.critical(f"❌ Erro no processamento da unidade '{unidade}': {e}", exc_info=True)
+            
     logger.info("✅ Pipeline finalizado com sucesso.")
 
 if __name__ == "__main__":

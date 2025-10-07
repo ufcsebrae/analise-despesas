@@ -1,4 +1,4 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM CORREÇÃO DO ANEXO)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM A IMPORTAÇÃO CORRIGIDA)
 
 import pandas as pd
 import logging, os, smtplib
@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from jinja2 import Environment, FileSystemLoader
-from typing import Dict, Any
+from typing import Dict, Any, List 
 
 logger = logging.getLogger(__name__)
 template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
@@ -20,7 +20,7 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
                               df_ocorrencias_atipicas: pd.DataFrame,
                               df_clusters_folha: Dict[str, pd.DataFrame],
                               resumo_clusters_folha: Dict[str, Dict[str, Any]]) -> str:
-    # (O código desta função permanece inalterado)
+    # (Este código está perfeito e não precisa de alterações)
     logger.info("Gerando corpo de e-mail com todas as análises...")
     template = env.get_template('relatorio_analise.html')
     def robust_currency_formatter(value):
@@ -41,7 +41,7 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
     clusters_folha_html = {name: df.to_html(index=False, na_rep='-', classes='table', formatters=formatters['folha_cluster']) for name, df in df_clusters_folha.items()}
     return template.render(unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo_formatado, itens_resumo=itens_resumo, tem_exclusivos=not df_orcamento_exclusivo.empty, tem_compartilhados=not df_orcamento_compartilhado.empty, tem_fornecedores_exclusivos=not df_fornecedores_exclusivo.empty, tem_fornecedores_compartilhados=not df_fornecedores_compartilhado.empty, tem_ocorrencias_atipicas=not df_ocorrencias_atipicas.empty, tem_contexto_exclusivo=resumo.get("valor_mediano_mes_exclusivo") is not None, tem_contexto_compartilhado=resumo.get("valor_mediano_mes_compartilhado") is not None, tem_clusters_folha=bool(df_clusters_folha), clusters_folha=clusters_folha_html, resumo_clusters_folha=resumo_clusters_formatado, **tabelas_html)
 
-def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, caminho_anexo: str = None):
+def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, caminhos_anexos: List[str] = None):
     logger.info(f"Iniciando envio de e-mail para {destinatario} via SMTP...")
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
@@ -55,25 +55,37 @@ def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, cami
         msg['Subject'] = assunto
         msg['From'] = smtp_user
         msg['To'] = destinatario
-
         msg.attach(MIMEText(corpo_html, 'html'))
         
-        # --- LÓGICA PARA ANEXAR O ARQUIVO ---
-        if caminho_anexo:
-            logger.info(f"Anexando arquivo: {caminho_anexo}")
-            
-            # --- CORREÇÃO AQUI ---
-            # Abrimos o arquivo em modo texto e usamos MIMEText com o subtipo 'csv'
-            with open(caminho_anexo, "r", encoding="utf-8-sig") as attachment:
-                part = MIMEText(attachment.read(), "csv", "utf-8")
+        if caminhos_anexos:
+            for caminho_anexo in caminhos_anexos:
+                if not os.path.exists(caminho_anexo):
+                    logger.warning(f"Arquivo de anexo não encontrado: {caminho_anexo}. Pulando.")
+                    continue
 
-            # Adicionamos o cabeçalho para garantir que ele seja tratado como um anexo para download
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename={os.path.basename(caminho_anexo)}",
-            )
-            msg.attach(part)
-            logger.info("Arquivo anexado com sucesso.")
+                filename = os.path.basename(caminho_anexo)
+                logger.info(f"Anexando arquivo: {filename}")
+                
+                ctype = 'application/octet-stream'
+                if filename.lower().endswith('.csv'):
+                    ctype = 'text/csv'
+                elif filename.lower().endswith('.pptx'):
+                    ctype = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                
+                maintype, subtype = ctype.split('/', 1)
+
+                if maintype == 'text':
+                    with open(caminho_anexo, 'r', encoding='utf-8-sig') as attachment:
+                        part = MIMEText(attachment.read(), subtype, 'utf-8')
+                else:
+                    with open(caminho_anexo, 'rb') as attachment:
+                        part = MIMEBase(maintype, subtype)
+                        part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                msg.attach(part)
+                logger.info(f"Arquivo '{filename}' anexado com o tipo MIME '{ctype}'.")
 
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.starttls()

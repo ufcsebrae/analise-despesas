@@ -1,4 +1,4 @@
-# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM TODAS AS FUNÇÕES)
+# analise_despesa/analise/insights_ia.py (VERSÃO FINAL COM AJUSTE DE ROBUSTEZ)
 import pandas as pd
 import logging
 from sklearn.ensemble import IsolationForest
@@ -11,72 +11,45 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 def detectar_anomalias_de_contexto(df: pd.DataFrame, contamination: float = 0.03) -> pd.DataFrame:
-    """
-    Usa Engenharia de Features (Z-Score + Frequência) e Isolation Forest para encontrar ocorrências atípicas.
-    """
-    if df.empty or len(df) < 10:
-        logger.warning("Dados insuficientes para a análise de ocorrências atípicas de contexto.")
-        return pd.DataFrame()
-    
+    # (Código inalterado)
+    if df.empty or len(df) < 10: return pd.DataFrame()
     logger.info("Iniciando detecção de ocorrências atípicas com Engenharia de Features e Z-Score...")
     df_analise = df.copy()
-
     df_analise['FREQ_FORNECEDOR'] = df_analise.groupby('FORNECEDOR')['FORNECEDOR'].transform('count')
     df_analise['FREQ_PROJETO'] = df_analise.groupby('PROJETO')['PROJETO'].transform('count')
-
     group_stats = df_analise.groupby(['FORNECEDOR', 'PROJETO'])['VALOR'].agg(['mean', 'std']).reset_index()
     df_analise = pd.merge(df_analise, group_stats, on=['FORNECEDOR', 'PROJETO'], how='left')
-    
     df_analise['std'] = df_analise['std'].fillna(0)
     df_analise['Z_SCORE_VALOR'] = np.where(df_analise['std'] > 0, (df_analise['VALOR'] - df_analise['mean']) / df_analise['std'], 0)
     df_analise['Z_SCORE_VALOR'] = df_analise['Z_SCORE_VALOR'].fillna(0)
-
     features_para_analise = ['Z_SCORE_VALOR', 'FREQ_FORNECEDOR', 'FREQ_PROJETO']
-    
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(df_analise[features_para_analise])
-
     modelo_ia = IsolationForest(contamination=contamination, random_state=42)
     df_analise['ocorrencia_contexto'] = modelo_ia.fit_predict(features_scaled)
-    
     ocorrencias_contexto = df_analise[df_analise['ocorrencia_contexto'] == -1].copy()
-    
     logger.info(f"Análise de contexto com Z-Score concluída. Encontradas {len(ocorrencias_contexto)} ocorrências atípicas.")
-    
     colunas_relevantes = ['DATA', 'FORNECEDOR', 'PROJETO', 'VALOR', 'COMPLEMENTO', 'Z_SCORE_VALOR']
     return ocorrencias_contexto[colunas_relevantes]
 
 def investigar_causa_raiz_ocorrencia(df_ocorrencias: pd.DataFrame, df_historico_completo: pd.DataFrame) -> pd.DataFrame:
+    # (Código inalterado)
     if df_ocorrencias.empty: return df_ocorrencias
     logger.info(f"Iniciando investigação de causa raiz para {len(df_ocorrencias)} ocorrências...")
     df_investigado = df_ocorrencias.copy()
-
     freq_fornecedor_geral = df_historico_completo['FORNECEDOR'].value_counts()
     freq_combinacao_geral = df_historico_completo.groupby(['FORNECEDOR', 'PROJETO']).size()
-
     justificativas = []
     for idx, ocorrencia in df_investigado.iterrows():
         razoes = []
-        fornecedor = ocorrencia['FORNECEDOR']
-        projeto = ocorrencia['PROJETO']
-        
-        if 'Z_SCORE_VALOR' in ocorrencia and abs(ocorrencia['Z_SCORE_VALOR']) > 2.0:
-             razoes.append(f"Valor (R$ {ocorrencia['VALOR']:.0f}) é um pico ou vale estatístico (Z-Score: {ocorrencia['Z_SCORE_VALOR']:.2f}) para esta combinação Fornecedor/Projeto.")
-
-        if freq_combinacao_geral.get((fornecedor, projeto), 0) <= 2:
-            razoes.append(f"Combinação Fornecedor-Projeto rara (vista {freq_combinacao_geral.get((fornecedor, projeto), 0)}x no ano).")
-        
-        if freq_fornecedor_geral.get(fornecedor, 0) <= 3:
-            razoes.append(f"Fornecedor com baixa atividade geral na unidade ({freq_fornecedor_geral.get(fornecedor, 0)} lançamentos no ano).")
-
-        if not razoes:
-            razoes.append("Combinação de fatores (valor, frequência do fornecedor/projeto) considerada incomum pela IA.")
-            
+        fornecedor, projeto = ocorrencia['FORNECEDOR'], ocorrencia['PROJETO']
+        if 'Z_SCORE_VALOR' in ocorrencia and abs(ocorrencia['Z_SCORE_VALOR']) > 2.0: razoes.append(f"Valor (R$ {ocorrencia['VALOR']:.0f}) é um pico ou vale estatístico (Z-Score: {ocorrencia['Z_SCORE_VALOR']:.2f}) para esta combinação.")
+        if freq_combinacao_geral.get((fornecedor, projeto), 0) <= 2: razoes.append(f"Combinação Fornecedor-Projeto rara (vista {freq_combinacao_geral.get((fornecedor, projeto), 0)}x no ano).")
+        if freq_fornecedor_geral.get(fornecedor, 0) <= 3: razoes.append(f"Fornecedor com baixa atividade geral na unidade ({freq_fornecedor_geral.get(fornecedor, 0)} lançamentos no ano).")
+        if not razoes: razoes.append("Combinação de fatores (valor, frequência) considerada incomum pela IA.")
         justificativas.append(" | ".join(razoes))
-        
     df_investigado['Justificativa IA'] = justificativas
     df_investigado.drop(columns=['Z_SCORE_VALOR'], inplace=True, errors='ignore')
-    
     logger.info("Investigação concluída.")
     return df_investigado
 
@@ -97,16 +70,22 @@ def segmentar_contas_por_comportamento(df_a_segmentar: pd.DataFrame, n_clusters:
         return 0.0
     df_comportamento['coef_variacao'] = df_comportamento['DESC_NIVEL_4'].apply(calcular_cv)
     df_comportamento = df_comportamento[(df_comportamento['valor_total'] != 0) & (df_comportamento['frequencia'] > 0)].copy()
+    
+    # --- CORREÇÃO DE ROBUSTEZ ---
     if len(df_comportamento) < n_clusters:
-        n_clusters = len(df_comportamento) if len(df_comportamento) > 1 else 0
-        if n_clusters == 0: return {}, {}
+        n_clusters = len(df_comportamento)
+        if n_clusters < 2: # KMeans precisa de pelo menos 2 amostras para 1 cluster, ou n_samples >= n_clusters
+            logger.warning(f"Apenas {len(df_comportamento)} agrupamentos contábeis encontrados. Não é possível executar a clusterização.")
+            return {}, {}
         logger.warning(f"Número de agrupamentos ({len(df_comportamento)}) é menor que o de clusters desejado. Ajustando para {n_clusters} clusters.")
+
     features_para_cluster = ['valor_total', 'frequencia', 'coef_variacao']
     scaler = StandardScaler()
     df_scaled = pd.DataFrame(scaler.fit_transform(df_comportamento[features_para_cluster]), columns=features_para_cluster, index=df_comportamento.index)
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
     df_comportamento['cluster'] = kmeans.fit_predict(df_scaled)
-    clusters_tabelas, clusters_resumo = {}, {}
+    clusters_tabelas = {}
+    clusters_resumo = {}
     centroids = df_comportamento.groupby('cluster')[features_para_cluster].mean()
     prioridade = centroids.sort_values(by=['coef_variacao', 'frequencia', 'valor_total'], ascending=[False, False, False]).index
     nomes_usados = []

@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL COM HIGIENIZAÇÃO DO NOME DO ANEXO)
+# main.py (VERSÃO FINAL COM ANÁLISE DE CLUSTER LOCAL)
 
 import logging
 import datetime
@@ -60,23 +60,13 @@ def obter_parametros_interativos():
         print(f"Ocorreu um erro durante a entrada de dados: {e}")
         return None, None, None, None
 
-# --- NOVA FUNÇÃO PARA HIGIENIZAR NOMES DE ARQUIVO ---
 def slugify(text):
-    """
-    Converte um texto em um formato seguro para nomes de arquivo (ASCII).
-    """
-    text = str(text).lower()
-    # Substituições manuais para caracteres comuns em português
-    text = text.replace(' ', '_')
-    text = text.replace('ç', 'c')
-    text = text.replace('ã', 'a').replace('á', 'a').replace('à', 'a').replace('â', 'a')
-    text = text.replace('é', 'e').replace('ê', 'e')
-    text = text.replace('í', 'i')
-    text = text.replace('ó', 'o').replace('ô', 'o').replace('õ', 'o')
-    text = text.replace('ú', 'u')
-    # Remove qualquer caractere que não seja letra, número, underscore ou hífen
-    text = re.sub(r'[^\w-]', '', text)
-    return text
+    # (Código inalterado)
+    text = str(text).lower().replace(' ', '_')
+    text = text.replace('ç', 'c').replace('ã', 'a').replace('á', 'a').replace('à', 'a').replace('â', 'a')
+    text = text.replace('é', 'e').replace('ê', 'e').replace('í', 'i')
+    text = text.replace('ó', 'o').replace('ô', 'o').replace('õ', 'o').replace('ú', 'u')
+    return re.sub(r'[^\w-]', '', text)
 
 def executar_analise_distribuida():
     ano_interativo, mes_interativo, unidades_selecionadas, email_destino = obter_parametros_interativos()
@@ -84,12 +74,9 @@ def executar_analise_distribuida():
     elif unidades_selecionadas is None: return
     if unidades_selecionadas:
         logger.info(f"--- MODO INTERATIVO ATIVADO ---")
-        logger.info(f"Unidades selecionadas: {unidades_selecionadas}")
-        logger.info(f"E-mail de destino: {email_destino}")
         mapa_execucao = {unidade: email_destino for unidade in unidades_selecionadas}
     else:
         logger.info(f"--- MODO AUTOMÁTICO ATIVADO ---")
-        logger.info("Usando o mapa de gestores do arquivo config.py.")
         mapa_execucao = MAPA_GESTORES
     logger.info("🚀 Iniciando pipeline completo...")
     try:
@@ -112,10 +99,6 @@ def executar_analise_distribuida():
         if mes_interativo:
             logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {mes_interativo}. ")
             df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= mes_interativo].copy()
-        df_todos_exclusivos = df_analise_principal[df_analise_principal['tipo_projeto'] == 'Exclusivo'].copy()
-        df_clusters_global, resumo_clusters_global = {}, {}
-        if not df_todos_exclusivos.empty:
-            df_clusters_global, resumo_clusters_global = insights_ia.segmentar_contas_por_comportamento(df_todos_exclusivos)
     except Exception as e:
         logger.critical(f"❌ Falha na carga/integração inicial. Erro: {e}", exc_info=True)
         return
@@ -133,31 +116,34 @@ def executar_analise_distribuida():
             mes_referencia_num = df_unidade_bruto['MES'].max()
             resumo = agregacao.gerar_resumo_executivo(df_unidade_bruto, df_unidade_integrado, mes_referencia_num)
             resumo['numero_unidade'] = cod_unidade_analisada
-            df_clusters_unidade = {}
-            if df_clusters_global:
-                contas_da_unidade = df_unidade_bruto['DESC_NIVEL_4'].unique()
-                for nome_cluster, df_cluster in df_clusters_global.items():
-                    df_filtrado = df_cluster[df_cluster['Agrupamento Contábil (Nível 4)'].isin(contas_da_unidade)]
-                    if not df_filtrado.empty:
-                        df_clusters_unidade[nome_cluster] = df_filtrado
-            df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo']
+            
+            # --- CORREÇÃO: ANÁLISE DE CLUSTER MOVIDA PARA DENTRO DO LOOP ---
+            df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
+            df_clusters, resumo_clusters = {}, {}
+            if not df_unidade_exclusivos.empty:
+                df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
+
+            df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
+            df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
+            
             df_ocorrencias_atipicas_ano = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
-            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo'], df_ocorrencias_atipicas_ano)
-            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado'], df_ocorrencias_atipicas_ano)
+            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas_ano)
+            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_compartilhado, df_ocorrencias_atipicas_ano)
             df_fornecedores_exclusivo = agregacao.agregar_despesas_por_fornecedor(df_unidade_exclusivos, top_n=5)
             df_fornecedores_compartilhado = agregacao.agregar_despesas_por_fornecedor(df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Compartilhado'], top_n=5)
             df_mes_agregado = agregacao.agregar_despesas_por_mes(df_unidade_bruto)
+            
             meses_map = {1:'Jan', 2:'Fev', 3:'Mar', 4:'Abr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Set', 10:'Out', 11:'Nov', 12:'Dez'}
             resumo['mes_referencia'] = meses_map.get(mes_referencia_num, "N/A")
             df_ocorrencias_filtradas = df_ocorrencias_atipicas_ano[df_ocorrencias_atipicas_ano['DATA'].dt.month == mes_referencia_num].copy()
             df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_bruto)
             if not df_ocorrencias_investigadas.empty:
                 df_ocorrencias_investigadas.rename(columns={'VALOR': 'Realizado'}, inplace=True)
-            corpo_html = email.gerar_corpo_email_analise(unidade_gestora=unidade, data_relatorio=datetime.date.today().strftime('%d/%m/%Y'), resumo=resumo, df_orcamento_exclusivo=df_orcamento_exclusivo, df_orcamento_compartilhado=df_orcamento_compartilhado, df_fornecedores_exclusivo=df_fornecedores_exclusivo, df_fornecedores_compartilhado=df_fornecedores_compartilhado, df_mes_agregado=df_mes_agregado, df_ocorrencias_atipicas=df_ocorrencias_investigadas, df_clusters_folha=df_clusters_unidade, resumo_clusters_folha=resumo_clusters_global)
+
+            corpo_html = email.gerar_corpo_email_analise(unidade_gestora=unidade, data_relatorio=datetime.date.today().strftime('%d/%m/%Y'), resumo=resumo, df_orcamento_exclusivo=df_orcamento_exclusivo, df_orcamento_compartilhado=df_orcamento_compartilhado, df_fornecedores_exclusivo=df_fornecedores_exclusivo, df_fornecedores_compartilhado=df_fornecedores_compartilhado, df_mes_agregado=df_mes_agregado, df_ocorrencias_atipicas=df_ocorrencias_investigadas, df_clusters_folha=df_clusters, resumo_clusters_folha=resumo_clusters)
+            
             unidade_para_assunto = unidade.replace("SP - ", "")
             assunto = f"Análise de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
-            
-            # --- CORREÇÃO: Higienização do nome do arquivo ---
             unidade_para_arquivo = slugify(unidade_para_assunto)
             nome_arquivo_csv = f"despesa_{ano}{resumo['mes_referencia']}_{unidade_para_arquivo}.csv"
             caminho_anexo = OUTPUT_DIR / nome_arquivo_csv

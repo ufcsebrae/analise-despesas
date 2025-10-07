@@ -158,4 +158,4 @@ def executar_analise_distribuida():
     logger.info("✅ Pipeline finalizado com sucesso.")
 
 if __name__ == "__main__":
-    #executar_analise_distribuida()
+    executar_analise_distribuida()

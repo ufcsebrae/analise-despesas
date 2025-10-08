@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL COM SUAS SUGESTÕES INTEGRADAS)
+# main.py (VERSÃO FINAL QUE ORQUESTRA OS DOIS RELATÓRIOS)
 
 import logging
 import datetime
@@ -17,7 +17,6 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 def obter_parametros_interativos():
-    # (Seu código original, que está perfeito, permanece aqui)
     if not sys.stdout.isatty():
         logger.info("Terminal não interativo detectado. Pulando para o modo automático.")
         return None, None, [], ""
@@ -71,14 +70,12 @@ def executar_analise_distribuida():
     ano_interativo, mes_interativo, unidades_selecionadas, email_destino = obter_parametros_interativos()
     if ano_interativo is None and mes_interativo is None and not unidades_selecionadas and not email_destino: pass
     elif unidades_selecionadas is None: return
-
     if unidades_selecionadas:
         logger.info(f"--- MODO INTERATIVO ATIVADO ---")
         mapa_execucao = {unidade: email_destino for unidade in unidades_selecionadas}
     else:
         logger.info(f"--- MODO AUTOMÁTICO ATIVADO ---")
         mapa_execucao = MAPA_GESTORES
-
     logger.info("🚀 Iniciando pipeline completo...")
     try:
         ano = ano_interativo if ano_interativo is not None else PARAMETROS_ANALISE["ANO_REFERENCIA"]
@@ -96,20 +93,10 @@ def executar_analise_distribuida():
         df_integrado = pd.merge(df_real_agg, df_orcado_anual, left_on='CODCCUSTO_JUNCAO', right_on='CODCCUSTO', how='left', suffixes=('', '_orcado'))
         df_integrado['VALOR_ORCADO'] = df_integrado['VALOR_ORCADO'].fillna(0)
         df_integrado.drop(columns=['CODCCUSTO'], inplace=True, errors='ignore')
-
         df_analise_principal = df_realizado_enriquecido.copy()
         if mes_interativo:
             logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {mes_interativo}. ")
             df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= mes_interativo].copy()
-        
-        # --- GERAÇÃO DA APRESENTAÇÃO FEITA UMA ÚNICA VEZ ---
-        caminho_pptx = OUTPUT_DIR / "Documentacao_Metodologia_Robo_Despesas.pptx"
-        try:
-            apresentacao.gerar_pptx_metodologia(str(caminho_pptx))
-        except Exception as e:
-            logger.critical(f"❌ Falha ao gerar a apresentação da metodologia. O processo continuará sem este anexo. Erro: {e}")
-            caminho_pptx = None
-
     except Exception as e:
         logger.critical(f"❌ Falha na carga/integração inicial. Erro: {e}", exc_info=True)
         return
@@ -121,7 +108,6 @@ def executar_analise_distribuida():
             if df_unidade_bruto.empty: 
                 logger.warning(f"Nenhum dado encontrado para a unidade '{unidade}' no período selecionado. Pulando.")
                 continue
-            
             df_unidade_integrado = df_integrado[df_integrado['UNIDADE'].str.strip() == unidade].copy()
             cod_unidade_analisada = df_unidade_bruto['CC'].str[-3:].iloc[0]
             mes_referencia_num = df_unidade_bruto['MES'].max()
@@ -130,41 +116,52 @@ def executar_analise_distribuida():
             
             df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
             df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
-            
             df_ocorrencias_atipicas_ano = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
+            
             df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo'], df_ocorrencias_atipicas_ano)
             df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado'], df_ocorrencias_atipicas_ano)
-            df_fornecedores_exclusivo = agregacao.agregar_despesas_por_fornecedor(df_unidade_exclusivos, top_n=5)
-            df_fornecedores_compartilhado = agregacao.agregar_despesas_por_fornecedor(df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Compartilhado'], top_n=5)
+            df_fornecedores_exclusivo = agregacao.agregar_despesas_por_fornecedor(df_unidade_exclusivos, top_n=10)
             df_mes_agregado = agregacao.agregar_despesas_por_mes(df_unidade_bruto)
             
             meses_map = {1:'Jan', 2:'Fev', 3:'Mar', 4:'Abr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Set', 10:'Out', 11:'Nov', 12:'Dez'}
             resumo['mes_referencia'] = meses_map.get(mes_referencia_num, "N/A")
+            resumo['df_mes_agregado_raw'] = df_mes_agregado
             
             df_ocorrencias_filtradas = df_ocorrencias_atipicas_ano[df_ocorrencias_atipicas_ano['DATA'].dt.month == mes_referencia_num].copy()
-            df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_bruto)
-            if not df_ocorrencias_investigadas.empty:
-                df_ocorrencias_investigadas.rename(columns={'VALOR': 'Realizado'}, inplace=True)
+            df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_exclusivos)
 
-            corpo_html = email.gerar_corpo_email_analise(unidade_gestora=unidade, data_relatorio=datetime.date.today().strftime('%d/%m/%Y'), resumo=resumo, df_orcamento_exclusivo=df_orcamento_exclusivo, df_orcamento_compartilhado=df_orcamento_compartilhado, df_fornecedores_exclusivo=df_fornecedores_exclusivo, df_fornecedores_compartilhado=df_fornecedores_compartilhado, df_mes_agregado=df_mes_agregado, df_ocorrencias_atipicas=df_ocorrencias_investigadas, df_clusters_folha=df_clusters, resumo_clusters_folha=resumo_clusters)
+            # --- GERAÇÃO DO RELATÓRIO DETALHADO ---
+            unidade_para_arquivo = slugify(unidade.replace("SP - ", ""))
+            nome_arquivo_detalhado = f"relatorio_detalhado_{unidade_para_arquivo}_{ano}{resumo['mes_referencia']}.html"
+            caminho_relatorio_detalhado = OUTPUT_DIR / nome_arquivo_detalhado
+            
+            html_detalhado = email.gerar_relatorio_detalhado(
+                unidade_gestora=unidade, resumo=resumo,
+                df_unidade_bruto=df_unidade_bruto,
+                df_orcamento_exclusivo=df_orcamento_exclusivo,
+                df_fornecedores_exclusivo=df_fornecedores_exclusivo,
+                df_ocorrencias_atipicas=df_ocorrencias_investigadas,
+                df_clusters=df_clusters,
+                resumo_clusters=resumo_clusters
+            )
+            with open(caminho_relatorio_detalhado, 'w', encoding='utf-8') as f:
+                f.write(html_detalhado)
+            logger.info(f"Relatório detalhado gerado em: {caminho_relatorio_detalhado}")
+
+            # --- GERAÇÃO DO E-MAIL SIMPLIFICADO ---
+            corpo_html = email.gerar_corpo_email_analise(
+                unidade_gestora=unidade, data_relatorio=datetime.date.today().strftime('%d/%m/%Y'), resumo=resumo,
+                df_orcamento_exclusivo=df_orcamento_exclusivo, 
+                df_orcamento_compartilhado=df_orcamento_compartilhado,
+                df_mes_agregado=df_mes_agregado,
+                link_relatorio_detalhado=caminho_relatorio_detalhado.as_uri()
+            )
             
             unidade_para_assunto = unidade.replace("SP - ", "")
-            assunto = f"Análise de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
-            unidade_para_arquivo = slugify(unidade_para_assunto)
-            nome_arquivo_csv = f"despesa_{ano}{resumo['mes_referencia']}_{unidade_para_arquivo}.csv"
-            caminho_anexo_csv = OUTPUT_DIR / nome_arquivo_csv
+            assunto = f"Sumário de Despesas - {unidade_para_assunto} - Ref {resumo['mes_referencia']}/{ano}"
             
-            logger.info(f"Gerando arquivo de despesas para anexo em: {caminho_anexo_csv}")
-            df_unidade_bruto.to_csv(caminho_anexo_csv, index=False, sep=';', encoding='utf-8-sig')
-            
-            # --- CRIAÇÃO DA LISTA DE ANEXOS ---
-            anexos_a_enviar = [str(caminho_anexo_csv)]
-            if caminho_pptx and os.path.exists(caminho_pptx):
-                anexos_a_enviar.append(str(caminho_pptx))
-            
-            # --- ENVIO DO E-MAIL COM MÚLTIPLOS ANEXOS ---
-            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor_final, caminhos_anexos=anexos_a_enviar)
-            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado com anexo(s) para '{email_gestor_final}'.")
+            email.enviar_email_via_smtp(assunto, corpo_html, email_gestor_final)
+            logger.info(f"✅ Análise da unidade '{unidade}' concluída e e-mail enviado para '{email_gestor_final}'.")
             
         except Exception as e:
             logger.critical(f"❌ Erro no processamento da unidade '{unidade}': {e}", exc_info=True)

@@ -1,14 +1,13 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM GERAÇÃO DE RELATÓRIO SEPARADO)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COMPLETA)
 
 import pandas as pd
 import logging, os, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
 from jinja2 import Environment, FileSystemLoader
 from typing import Dict, Any, List
-from . import graficos_html # Importa o novo módulo
+from . import graficos_html
+import json
 
 logger = logging.getLogger(__name__)
 template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
@@ -60,26 +59,33 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
     )
 
 def gerar_relatorio_detalhado(unidade_gestora: str, resumo: dict,
+                               df_unidade_bruto: pd.DataFrame,
+                               df_orcamento_exclusivo: pd.DataFrame,
+                               df_fornecedores_exclusivo: pd.DataFrame,
                                df_ocorrencias_atipicas: pd.DataFrame,
                                df_clusters: Dict[str, pd.DataFrame],
                                resumo_clusters: Dict[str, Dict[str, Any]]) -> str:
-    """Gera o HTML do relatório detalhado com gráficos."""
+    """Gera o HTML do relatório detalhado com todos os gráficos e tabelas de IA."""
     logger.info("Gerando corpo do relatório detalhado interativo...")
     template = env.get_template('relatorio_detalhado.html')
     
-    chart_data_json = graficos_html.preparar_dados_para_grafico_cluster(df_clusters)
-    
+    chart_data_json = {
+        'orcamento': graficos_html.preparar_dados_execucao_orcamentaria(df_orcamento_exclusivo),
+        'tendencia': graficos_html.preparar_dados_tendencia_mensal(resumo['df_mes_agregado_raw']),
+        'fornecedores': graficos_html.preparar_dados_top_fornecedores(df_fornecedores_exclusivo),
+        'ocorrencias': graficos_html.preparar_dados_ocorrencias_por_justificativa(df_ocorrencias_atipicas),
+        'treemap': graficos_html.preparar_dados_treemap_contas(df_unidade_bruto),
+        'cluster': graficos_html.preparar_dados_para_grafico_cluster(df_clusters)
+    }
+
     def robust_currency_formatter(value):
         if pd.isna(value) or (isinstance(value, (int, float)) and value == 0): return "-"
         if isinstance(value, str): return value
         return f"R$ {value:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
     def robust_int_formatter(value):
         if pd.isna(value): return "-"
         return f"{int(value):,}".replace(",", ".")
-
     def robust_percent_formatter(value):
-        if isinstance(value, str): return value
         if pd.isna(value): return "N/A"
         return f"{value:.0%}"
 
@@ -107,9 +113,8 @@ def gerar_relatorio_detalhado(unidade_gestora: str, resumo: dict,
         tabela_ocorrencias_atipicas=tabela_ocorrencias_html,
         clusters_folha=clusters_html,
         resumo_clusters_folha=resumo_clusters_formatado,
-        chart_data_json=chart_data_json
+        chart_data_json=json.dumps(chart_data_json)
     )
-
 
 def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, caminhos_anexos: List[str] = None):
     logger.info(f"Iniciando envio de e-mail para {destinatario} via SMTP...")

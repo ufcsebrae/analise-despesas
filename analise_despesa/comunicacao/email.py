@@ -1,4 +1,4 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COMPLETA)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM RESUMO RESTAURADO)
 
 import pandas as pd
 import logging, os, smtplib
@@ -16,7 +16,7 @@ env = Environment(loader=FileSystemLoader(template_dir))
 def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo: dict,
                               df_orcamento_exclusivo: pd.DataFrame, df_orcamento_compartilhado: pd.DataFrame,
                               df_mes_agregado: pd.DataFrame, link_relatorio_detalhado: str) -> str:
-    """Gera o corpo do e-mail SUMARIZADO."""
+    """Gera o corpo do e-mail SUMARIZADO, mas com o resumo completo."""
     template = env.get_template('relatorio_analise.html')
     
     def robust_currency_formatter(value):
@@ -29,6 +29,7 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
         if pd.isna(value): return "N/A"
         return f"{value:.0%}"
 
+    # --- LÓGICA DE RESUMO COMPLETA RESTAURADA ---
     itens_resumo = [
         {"indicador": "Total Gasto (Realizado)", "mes": robust_currency_formatter(resumo.get("valor_total_mes")), "ano": robust_currency_formatter(resumo.get("valor_total_ano")), "is_total": True},
         {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas exclusivas", "mes": robust_currency_formatter(resumo.get("gastos_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("gastos_ano_exclusivo")), "is_total": False},
@@ -65,6 +66,7 @@ def gerar_relatorio_detalhado(unidade_gestora: str, resumo: dict,
                                df_ocorrencias_atipicas: pd.DataFrame,
                                df_clusters: Dict[str, pd.DataFrame],
                                resumo_clusters: Dict[str, Dict[str, Any]]) -> str:
+    
     """Gera o HTML do relatório detalhado com todos os gráficos e tabelas de IA."""
     logger.info("Gerando corpo do relatório detalhado interativo...")
     template = env.get_template('relatorio_detalhado.html')

@@ -1,4 +1,4 @@
-<!-- templates/relatorio_analise.html (VERSÃO SIMPLIFICADA) -->
+<!-- templates/relatorio_analise.html (VERSÃO FINAL COM RESUMO COMPLETO) -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -10,12 +10,11 @@
         h1, h2, h3 { color: #1f497d; border-bottom: 1px solid #c6d9f1; padding-bottom: 8px; font-weight: bold; }
         h1 { font-size: 26px; text-align: center; }
         h2 { font-size: 22px; margin-top: 40px; }
-        h3 { font-size: 18px; margin-top: 25px; border-bottom: none; color: #4e81bd; }
         table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 14px; }
         th, td { border: 1px solid #c6d9f1; padding: 10px; text-align: left; }
         th { background-color: #f2f7ff; font-weight: bold; }
         tr:nth-child(even) { background-color: #f8faff; }
-        .section-intro { font-size: 15px; color: #333; background-color: #f8faff; padding: 15px; border-left: 5px solid #5b9bd5; margin-bottom: 20px; }
+        .section-intro { font-size: 15px; color: #333; background-color: #eaf1fa; padding: 15px; border-left: 5px solid #5b9bd5; margin-bottom: 20px; border-radius: 5px; }
         .summary-table th { text-align: left; }
         .summary-table td:nth-child(2), .summary-table td:nth-child(3) { text-align: right; }
         .footer { text-align: center; color: #888; margin-top: 50px; }
@@ -38,7 +37,7 @@
         
         <div style="text-align: center; margin: 30px 0;">
             <a href="{{ link_relatorio_detalhado }}" style="background-color: #005691; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
-                Acessar Relatório Detalhado Interativo
+                Acessar Dashboard Detalhado
             </a>
         </div>
 
@@ -64,7 +63,7 @@
 
         <h2>1. Execução Orçamentária (Ano)</h2>
         <p class="section-intro">
-            Comparamos o planejado com o gasto. A coluna <strong>'Criticidade'</strong> age como um termômetro de risco, combinando a execução do orçamento com a ocorrência de ocorrências atípicas (detalhadas no relatório interativo).
+            Comparamos o planejado com o gasto. A coluna <strong>'Criticidade'</strong> age como um termômetro de risco, combinando a execução do orçamento com a ocorrência de ocorrências atípicas (detalhadas no dashboard).
         </p>
         {% if tem_exclusivos %}
             <h3>1.A: Iniciativas exclusivas</h3>
@@ -81,7 +80,7 @@
         </p>
         {{ tabela_mes_agregado | safe }}
 
-        <p class="footer">Este é um sumário executivo. O detalhamento completo das análises de IA está disponível no link acima.</p>
+        <p class="footer">Este é um sumário executivo. O detalhamento completo das análises de IA está disponível no link do dashboard.</p>
     </div>
 </body>
 </html>

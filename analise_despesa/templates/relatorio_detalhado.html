@@ -1,37 +1,51 @@
-<!-- templates/relatorio_detalhado.html -->
+<!-- templates/relatorio_detalhado.html (VERSÃO FINAL COMPLETA) -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>Relatório Detalhado de Análise de Despesas</title>
-    <!-- Importa a biblioteca Chart.js diretamente da internet -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0/dist/chartjs-chart-treemap.min.js"></script>
     <style>
-        body { font-family: 'Calibri', 'Segoe UI', sans-serif; color: #1f497d; line-height: 1.5; margin: 0; padding: 0; background-color: #f8faff; }
-        .container { max-width: 1200px; margin: auto; padding: 20px; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2, h3 { color: #1f497d; border-bottom: 1px solid #c6d9f1; padding-bottom: 8px; font-weight: bold; }
-        h1 { font-size: 28px; text-align: center; }
-        h2 { font-size: 24px; margin-top: 40px; }
-        h3 { font-size: 20px; margin-top: 25px; border-bottom: none; color: #4e81bd; }
-        table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 14px; }
-        th, td { border: 1px solid #c6d9f1; padding: 10px; text-align: left; }
-        th { background-color: #f2f7ff; font-weight: bold; }
-        .section-intro { font-size: 15px; color: #333; background-color: #f8faff; padding: 15px; border-left: 5px solid #5b9bd5; margin-bottom: 20px; }
-        .chart-container { position: relative; height: 50vh; width: 80vw; margin: auto; margin-top: 20px; }
-        .footer { text-align: center; color: #888; margin-top: 50px; }
+        body { font-family: 'Calibri', 'Segoe UI', sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f7f9; }
+        .container { max-width: 1800px; margin: auto; }
+        h1, h2, h3 { color: #1f497d; font-weight: bold; }
+        h1 { font-size: 32px; text-align: center; margin-bottom: 10px; }
+        h2 { font-size: 28px; margin-top: 50px; border-bottom: 2px solid #5b9bd5; padding-bottom: 10px;}
+        h3 { font-size: 22px; margin-top: 30px; color: #4e81bd; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 14px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #f8faff; font-weight: bold; color: #495057; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; margin-bottom: 40px; }
+        .chart-card { background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .chart-card:hover { transform: translateY(-5px); }
+        .full-width-card { grid-column: 1 / -1; }
+        .section-intro { font-size: 16px; color: #333; background-color: #eaf1fa; padding: 20px; border-left: 5px solid #5b9bd5; margin-bottom: 25px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Relatório Detalhado - Análises de IA</h1>
-        <p style="text-align: center;">
-            <strong>Unidade:</strong> {{ unidade_gestora }} | <strong>Mês de Referência:</strong> {{ resumo.mes_referencia }}
+        <h1>Dashboard Analítico de Despesas</h1>
+        <p style="text-align: center; font-size: 18px; color: #555;">
+            <strong>Unidade:</strong> {{ unidade_gestora }} | <strong>Período de Referência:</strong> {{ resumo.mes_referencia }} de {{ data_relatorio.split('/')[-1] }}
         </p>
 
-        <h2>4. Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h2>
+        <h2>Painel Visual de Análises</h2>
+        <div class="grid-container">
+            <div class="chart-card full-width-card"><canvas id="tendenciaChart" height="100"></canvas></div>
+            <div class="chart-card"><canvas id="orcamentoChart"></canvas></div>
+            <div class="chart-card"><canvas id="fornecedoresChart"></canvas></div>
+            <div class="chart-card"><canvas id="distribuicaoChart"></canvas></div>
+            <div class="chart-card"><canvas id="ocorrenciasChart"></canvas></div>
+            <div class="chart-card full-width-card"><canvas id="treemapChart" style="height: 500px;"></canvas></div>
+        </div>
+
+        <h2>Análises Detalhadas de Inteligência Artificial</h2>
+        
+        <h3>Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h3>
         <div class="section-intro">
-            <strong>Metodologia Técnica Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
-            A IA age como um auditor estatístico, avaliando cada transação em três dimensões: o desvio estatístico do valor (Z-Score), a familiaridade do fornecedor e a familiaridade do projeto. O modelo `IsolationForest` sinaliza ocorrências onde a combinação desses fatores é rara, focando em eventos genuinamente incomuns.
+            <strong>Metodologia Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
+            A IA age como um auditor estatístico, avaliando cada transação em três dimensões: o desvio estatístico do valor (Z-Score), a familiaridade do fornecedor e a familiaridade do projeto. O modelo sinaliza ocorrências onde a combinação desses fatores é rara, focando em eventos genuinamente incomuns.
         </div>
         {% if tem_ocorrencias_atipicas %}
             {{ tabela_ocorrencias_atipicas | safe }}
@@ -39,82 +53,36 @@
             <p>Nenhuma ocorrência atípica de contexto foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
         {% endif %}
 
-        <h2>5. Análise de Comportamento: Contas de Projetos Exclusivos (IA)</h2>
+        <h3>Análise de Comportamento: Contas de Projetos Exclusivos (IA)</h3>
         <div class="section-intro">
-            <strong>Metodologia Técnica Aplicada (K-Means Clustering):</strong><br>
-            Esta análise agrupa os tipos de despesa dos projetos exclusivos da sua unidade com base em seu "DNA" financeiro (Valor Total, Frequência e Variação). O gráfico abaixo ilustra esses perfis.
+            <strong>Metodologia Aplicada (K-Means Clustering):</strong><br>
+            A IA agrupa os tipos de despesa dos projetos exclusivos com base em seu "DNA" financeiro (Valor Total, Frequência e Variação). O gráfico de bolhas abaixo ilustra esses perfis, onde o tamanho da bolha representa o nível de imprevisibilidade (CV).
         </div>
-        
-        <div class="chart-container">
-            <canvas id="clusterChart"></canvas>
-        </div>
-
+        <div class="chart-card full-width-card"><canvas id="clusterChart" style="height: 500px;"></canvas></div>
         {% if tem_clusters_folha %}
             {% for nome_cluster, tabela_html_cluster in clusters_folha.items() %}
-                <h3>5.{{ loop.index }}: {{ nome_cluster }}</h3>
+                <h4>{{ nome_cluster }}</h4>
                 <div class="section-intro">
-                    <strong>Interpretação do Perfil:</strong> {{ resumo_clusters_folha[nome_cluster].description }}<br><br>
-                    <strong>Ênfase do Perfil (Valores Médios do Grupo):</strong><br>
-                    Os agrupamentos neste perfil tiveram, em média, um <strong>valor total</strong> de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].valor_total }}</strong>, distribuído em aproximadamente <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].frequencia }}</strong> lançamentos, com uma <strong>Coeficiente de Variação (imprevisibilidade)</strong> de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].coef_variacao }}</strong>.
+                    <strong>Interpretação do Perfil:</strong> {{ resumo_clusters_folha[nome_cluster].description }}
                 </div>
                 {{ tabela_html_cluster | safe }}
             {% endfor %}
         {% else %}
             <p>Não foi possível gerar a análise de comportamento para as contas dos projetos exclusivos desta unidade.</p>
         {% endif %}
-
-        <p class="footer">Relatório gerado automaticamente.</p>
     </div>
 
     <script>
-        // Os dados do gráfico são injetados aqui pelo Python
-        var clusterData = {{ chart_data_json | safe }};
+        const chartData = {{ chart_data_json | safe }};
+        const createChart = (id, type, data, options = {}) => new Chart(document.getElementById(id), { type, data, options });
 
-        new Chart(document.getElementById('clusterChart'), {
-            type: 'bubble',
-            data: {
-                datasets: clusterData.datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Visualização dos Perfis de Contas Contábeis',
-                        font: { size: 18 }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                label += context.raw.label;
-                                return label;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Valor Total Anual (Log)'
-                        },
-                        type: 'logarithmic' // Escala logarítmica para lidar com grandes diferenças de valor
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Frequência de Lançamentos (Log)'
-                        },
-                        type: 'logarithmic'
-                    }
-                }
-            }
-        });
+        if (chartData.tendencia && chartData.tendencia.labels && chartData.tendencia.labels.length > 0) createChart('tendenciaChart', 'line', chartData.tendencia, { plugins: { title: { display: true, text: 'Evolução Mensal dos Gastos da Unidade', font: { size: 18 } } } });
+        if (chartData.orcamento && chartData.orcamento.labels && chartData.orcamento.labels.length > 0) createChart('orcamentoChart', 'bar', chartData.orcamento, { indexAxis: 'y', plugins: { title: { display: true, text: 'Execução Orçamentária (Top 10 Projetos por %)', font: { size: 18 } } } });
+        if (chartData.fornecedores && chartData.fornecedores.labels && chartData.fornecedores.labels.length > 0) createChart('fornecedoresChart', 'bar', chartData.fornecedores, { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 10 Fornecedores (Projetos Exclusivos)', font: { size: 18 } } } });
+        if (chartData.distribuicao_tipo_projeto && chartData.distribuicao_tipo_projeto.labels && chartData.distribuicao_tipo_projeto.labels.length > 0) createChart('distribuicaoChart', 'doughnut', chartData.distribuicao_tipo_projeto, { plugins: { title: { display: true, text: 'Distribuição de Gastos por Tipo de Projeto', font: { size: 18 } } } });
+        if (chartData.ocorrencias && chartData.ocorrencias.labels && chartData.ocorrencias.labels.length > 0) createChart('ocorrenciasChart', 'pie', chartData.ocorrencias, { plugins: { title: { display: true, text: 'Ocorrências Atípicas por Justificativa da IA', font: { size: 18 } } } });
+        if (chartData.treemap && chartData.treemap.datasets && chartData.treemap.datasets.length > 0) createChart('treemapChart', 'treemap', chartData.treemap, { plugins: { title: { display: true, text: 'Composição dos Gastos por Agrupamento Contábil', font: { size: 18 } } } });
+        if (chartData.cluster && chartData.cluster.datasets && chartData.cluster.datasets.length > 0) createChart('clusterChart', 'bubble', chartData.cluster, { plugins: { title: { display: true, text: 'Visualização dos Perfis de Contas (DNA Financeiro)', font: { size: 18 } } }, scales: { y: { type: 'logarithmic', title: { display: true, text: 'Valor Total (R$)' } }, x: { type: 'logarithmic', title: { display: true, text: 'Frequência (Qtd. Lançamentos)' } } } });
     </script>
 </body>
 </html>

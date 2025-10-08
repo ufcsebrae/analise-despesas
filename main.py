@@ -1,4 +1,4 @@
-# main.py (VERSÃO FINAL REESCRITA E CORRIGIDA)
+# main.py (VERSÃO FINAL COM SUAS SUGESTÕES INTEGRADAS)
 
 import logging
 import datetime
@@ -101,18 +101,18 @@ def executar_analise_distribuida():
         if mes_interativo:
             logger.warning(f" MODO DE SOBRESCRITA ATIVADO: A análise será limitada aos dados até o mês {mes_interativo}. ")
             df_analise_principal = df_analise_principal[df_analise_principal['MES'] <= mes_interativo].copy()
+        
+        # --- GERAÇÃO DA APRESENTAÇÃO FEITA UMA ÚNICA VEZ ---
+        caminho_pptx = OUTPUT_DIR / "Documentacao_Metodologia_Robo_Despesas.pptx"
+        try:
+            apresentacao.gerar_pptx_metodologia(str(caminho_pptx))
+        except Exception as e:
+            logger.critical(f"❌ Falha ao gerar a apresentação da metodologia. O processo continuará sem este anexo. Erro: {e}")
+            caminho_pptx = None
 
     except Exception as e:
         logger.critical(f"❌ Falha na carga/integração inicial. Erro: {e}", exc_info=True)
         return
-
-    # --- GERAÇÃO DA APRESENTAÇÃO FEITA UMA ÚNICA VEZ ---
-    caminho_pptx = OUTPUT_DIR / "Documentacao_Metodologia_Robo_Despesas.pptx"
-    try:
-        apresentacao.gerar_pptx_metodologia(str(caminho_pptx))
-    except Exception as e:
-        logger.critical(f"❌ Falha ao gerar a apresentação da metodologia. O processo continuará sem este anexo. Erro: {e}")
-        caminho_pptx = None
 
     for unidade, email_gestor_final in mapa_execucao.items():
         logger.info(f"================== PROCESSANDO UNIDADE: {unidade} ==================")
@@ -121,33 +121,26 @@ def executar_analise_distribuida():
             if df_unidade_bruto.empty: 
                 logger.warning(f"Nenhum dado encontrado para a unidade '{unidade}' no período selecionado. Pulando.")
                 continue
+            
             df_unidade_integrado = df_integrado[df_integrado['UNIDADE'].str.strip() == unidade].copy()
-            
-            cod_unidade_analisada = "N/A"
-            if not df_unidade_bruto.empty:
-                cod_unidade_analisada = df_unidade_bruto['CC'].str[-3:].iloc[0]
-            
+            cod_unidade_analisada = df_unidade_bruto['CC'].str[-3:].iloc[0]
             mes_referencia_num = df_unidade_bruto['MES'].max()
             resumo = agregacao.gerar_resumo_executivo(df_unidade_bruto, df_unidade_integrado, mes_referencia_num)
             resumo['numero_unidade'] = cod_unidade_analisada
             
             df_unidade_exclusivos = df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Exclusivo'].copy()
-            df_clusters, resumo_clusters = {}, {}
-            if not df_unidade_exclusivos.empty:
-                df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
-            
-            df_integrado_exclusivo = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo']
-            df_integrado_compartilhado = df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado']
+            df_clusters, resumo_clusters = insights_ia.segmentar_contas_por_comportamento(df_unidade_exclusivos)
             
             df_ocorrencias_atipicas_ano = insights_ia.detectar_anomalias_de_contexto(df_unidade_exclusivos)
-            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_exclusivo, df_ocorrencias_atipicas_ano)
-            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_integrado_compartilhado, df_ocorrencias_atipicas_ano)
+            df_orcamento_exclusivo = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Exclusivo'], df_ocorrencias_atipicas_ano)
+            df_orcamento_compartilhado = agregacao.agregar_realizado_vs_orcado_por_projeto(df_unidade_integrado[df_unidade_integrado['tipo_projeto'] == 'Compartilhado'], df_ocorrencias_atipicas_ano)
             df_fornecedores_exclusivo = agregacao.agregar_despesas_por_fornecedor(df_unidade_exclusivos, top_n=5)
             df_fornecedores_compartilhado = agregacao.agregar_despesas_por_fornecedor(df_unidade_bruto[df_unidade_bruto['tipo_projeto'] == 'Compartilhado'], top_n=5)
             df_mes_agregado = agregacao.agregar_despesas_por_mes(df_unidade_bruto)
             
             meses_map = {1:'Jan', 2:'Fev', 3:'Mar', 4:'Abr', 5:'Mai', 6:'Jun', 7:'Jul', 8:'Ago', 9:'Set', 10:'Out', 11:'Nov', 12:'Dez'}
             resumo['mes_referencia'] = meses_map.get(mes_referencia_num, "N/A")
+            
             df_ocorrencias_filtradas = df_ocorrencias_atipicas_ano[df_ocorrencias_atipicas_ano['DATA'].dt.month == mes_referencia_num].copy()
             df_ocorrencias_investigadas = insights_ia.investigar_causa_raiz_ocorrencia(df_ocorrencias_filtradas, df_unidade_bruto)
             if not df_ocorrencias_investigadas.empty:

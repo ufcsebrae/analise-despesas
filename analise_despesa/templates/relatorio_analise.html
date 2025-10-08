@@ -1,4 +1,4 @@
-<!-- relatorio_analise.html (VERSÃO FINAL E COMPLETA) -->
+<!-- templates/relatorio_analise.html (VERSÃO SIMPLIFICADA) -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -33,23 +33,13 @@
 
         <div class="section-intro">
             <p><strong>Prezado(a) gestor(a),</strong></p>
-            <p>Eu sou seu assistente de análise de dados. Meu trabalho é processar milhares de lançamentos financeiros e transformá-los em informações claras e acionáveis para apoiar sua gestão. Este relatório foi preparado por mim e destaca os pontos mais importantes sobre as despesas da sua unidade.</p>
-            <p><strong>Conceitos e Modelos de IA Utilizados:</strong></p>
-            <ul>
-                <li><strong>Projetos Exclusivos vs. Compartilhados:</strong> </li>
-                    <ul>
-                        <li>Projetos "Exclusivos" são aqueles cujas despesas pertencem 100% à sua unidade. </li>
-                        <li>Projetos "Compartilhados" têm despesas que podem ser rateadas entre múltiplas unidades.</li>
-                    </ul>
-                <li>
-                    <strong>Sinalização da IA na Tendência Mensal (Tabela 2):</strong> O robô analisa o ritmo dos seus gastos totais ao longo do ano. Se um mês tem um pico ou queda muito brusca em comparação com o padrão, ele sinaliza como "Pico Atípico" ou "Redução Atípica".
-                </li>
-                <li>
-                    <strong>Ocorrências Atípicas de Contexto (Tabela 4):</strong> Esta é a principal análise de investigação. A IA agora analisa a "familiaridade" e o "desvio de valor" de cada transação. O modelo `IsolationForest` é treinado com métricas inteligentes, como a frequência do fornecedor/projeto e o Z-Score do valor, que mede quão estatisticamente incomum um valor é para seu grupo específico. Isso foca em encontrar eventos genuinamente estranhos, eliminando ruídos.
-                </li>
-
-                <li><strong>Análise de Comportamento (Tabela 5):</strong> A IA agrupa os tipos de despesa dos projetos exclusivos em "perfis" com base no seu comportamento financeiro (valor, frequência e previsibilidade), revelando a natureza dos custos da sua unidade.</li>
-            </ul>
+            <p>Este é o sumário executivo das despesas da sua unidade. Para uma análise mais aprofundada, incluindo gráficos e o detalhamento das análises de Inteligência Artificial, acesse o relatório interativo completo no link abaixo.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ link_relatorio_detalhado }}" style="background-color: #005691; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
+                Acessar Relatório Detalhado Interativo
+            </a>
         </div>
 
         <h2>Resumo Executivo</h2>
@@ -72,79 +62,26 @@
             </tbody>
         </table>
 
-        <h2>1. Execução Orçamentária - Ano</h2>
+        <h2>1. Execução Orçamentária (Ano)</h2>
         <p class="section-intro">
-            Comparamos o planejado (Orçado) com o gasto (Realizado). A coluna <strong>'Criticidade'</strong> age como um termômetro de risco, combinando a execução do orçamento com a ocorrência de ocorrências atípicas no ano (ver Tabela 4).<br>
-            <strong>↑ Alto:</strong> Execução acima de 90%, ou acima de 75% com ocorrências atípicas.<br>
-            <strong>→ Médio:</strong> Execução acima de 75%, ou qualquer projeto com ocorrências atípicas.<br>
-            <strong>↓ Baixo:</strong> Projetos dentro da normalidade e com orçamento sob controle.
+            Comparamos o planejado com o gasto. A coluna <strong>'Criticidade'</strong> age como um termômetro de risco, combinando a execução do orçamento com a ocorrência de ocorrências atípicas (detalhadas no relatório interativo).
         </p>
         {% if tem_exclusivos %}
-            <h3>1.a: Iniciativas exclusivas</h3>
+            <h3>1.A: Iniciativas exclusivas</h3>
             {{ tabela_orc_exclusivo | safe }}
         {% endif %}
         {% if tem_compartilhados %}
-            <h3>1.b: Iniciativas compartilhadas</h3>
+            <h3>1.B: Iniciativas compartilhadas</h3>
             {{ tabela_orc_compartilhado | safe }}
         {% endif %}
 
-        <h2>2. Desempenho Mensal - Ano</h2>
+        <h2>2. Desempenho Mensal (Ano)</h2>
         <p class="section-intro">
-            Como nossos gastos se comportaram mês a mês? A coluna <strong>'Sinalização da IA'</strong> atua sobre o <strong>total dos gastos mensais da unidade (somando projetos exclusivos e compartilhados)</strong>. Ela utiliza um modelo de IA para identificar meses com picos ou quedas que fogem do padrão de gastos do ano. Um "Pico Atípico" ou "Redução Atípica" sinaliza desvios significativos no ritmo das despesas que merecem sua atenção.
+            Ritmo das despesas da sua unidade. A coluna <strong>'Sinalização da IA'</strong> alerta para meses com picos ou quedas que fogem do padrão de gastos do ano.
         </p>
         {{ tabela_mes_agregado | safe }}
 
-        <h2>3. Top 5 Fornecedores - Ano</h2>
-        <p class="section-intro">Para onde o dinheiro está indo? Esta seção mostra os 5 fornecedores que mais receberam pagamentos da sua unidade.</p>
-        {% if tem_fornecedores_exclusivos %}
-            <h3>3.a: Fornecedores de Iniciativas exclusivas</h3>
-            {{ tabela_forn_exclusivo | safe }}
-        {% endif %}
-        {% if tem_fornecedores_compartilhados %}
-            <h3>3.b: Fornecedores de Iniciativas compartilhadas</h3>
-            {{ tabela_forn_compartilhado | safe }}
-        {% endif %}
-        
-        <h2>4. Ocorrências Atípicas de Contexto em Projetos Exclusivos</h2>
-        <div class="section-intro">
-            <strong>Metodologia Técnica Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
-            A IA agora age como um auditor estatístico, avaliando cada transação em três dimensões:<br>
-                <ul>
-                    <li><strong>Anomalia de Valor (Z-Score):</strong> O robô calcula a média e o desvio padrão dos gastos para <i>cada</i> combinação específica de Fornecedor-Projeto. Ele então mede quão longe (em desvios padrão) o valor do lançamento atual está da média do seu próprio grupo. Um Z-Score alto indica uma variação de valor estatisticamente significativa.<br></li>
-                    <li><strong>Familiaridade do Fornecedor:</strong> O robô mede a frequência de atividade do fornecedor na sua unidade durante o ano.<br></li>
-                    <li><strong>Familiaridade do Projeto:</strong> O robô mede a frequência de lançamentos no projeto.<br><br></li>
-                </ul>
-            O modelo `IsolationForest` é treinado com essas três métricas inteligentes. Ele sinaliza ocorrências onde a combinação desses fatores é rara, focando em eventos genuinamente incomuns e eliminando "falsos positivos" de variações normais de valor. A coluna <strong>'Justificativa IA'</strong> explica o porquê.
-        </div>
-        {% if tem_ocorrencias_atipicas %}
-            {{ tabela_ocorrencias_atipicas | safe }}
-        {% else %}
-            <p>Nenhuma ocorrência atípica de contexto foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
-        {% endif %}
-
-        <h2>5. Análise de Comportamento das Contas de Projetos Exclusivos - Ano</h2>
-        <p class="section-intro">
-            <strong>Metodologia Técnica Aplicada (K-Means Clustering):</strong><br>
-            Esta análise utiliza Inteligência Artificial para agrupar os tipos de despesa dos **projetos exclusivos da sua unidade** (usando o agrupamento contábil de Nível 4) com base em seu "DNA" financeiro. O robô identifica padrões de comportamento usando três métricas principais:<br>
-            - <strong>Valor Total:</strong> O impacto financeiro total do agrupamento no ano.<br>
-            - <strong>Frequência:</strong> O número de lançamentos, indicando se é um gasto recorrente ou pontual.<br>
-            - <strong>Coeficiente de Variação (CV):</strong> Medida estatística que indica o nível de <strong>imprevisibilidade</strong> dos gastos mensais. Um CV alto significa que os valores variam muito de um mês para o outro.
-        </p>
-        {% if tem_clusters_folha %}
-            {% for nome_cluster, tabela_html_cluster in clusters_folha.items() %}
-                <h3>5.{{ loop.index }}: {{ nome_cluster }}</h3>
-                <p class="section-intro">
-                    <strong>Interpretação do Perfil:</strong> {{ resumo_clusters_folha[nome_cluster].description }}<br><br>
-                    <strong>Ênfase do Perfil (Valores Médios do Grupo):</strong><br>
-                    Os agrupamentos neste perfil tiveram, em média, um <strong>valor total</strong> de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].valor_total }}</strong>, distribuído em aproximadamente <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].frequencia }}</strong> lançamentos, com um <strong>Coeficiente de Variação (imprevisibilidade)</strong> de <strong style="color: #005691;">{{ resumo_clusters_folha[nome_cluster].coef_variacao }}</strong>.
-                </p>
-                {{ tabela_html_cluster | safe }}
-            {% endfor %}
-        {% else %}
-            <p>Não foi possível gerar a análise de comportamento para as contas dos projetos exclusivos desta unidade.</p>
-        {% endif %}
-
-        <p class="footer">Este é um relatório gerado automaticamente pelo Sistema de Análise de Despesas.</p>
+        <p class="footer">Este é um sumário executivo. O detalhamento completo das análises de IA está disponível no link acima.</p>
     </div>
 </body>
 </html>

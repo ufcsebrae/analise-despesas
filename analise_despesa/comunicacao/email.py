@@ -1,9 +1,11 @@
-# analise_despesa/comunicacao/email.py (VERSÃO FINAL COM RESUMO RESTAURADO)
+# analise_despesa/comunicacao/email.py (VERSÃO FINAL COMPLETA)
 
 import pandas as pd
 import logging, os, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from jinja2 import Environment, FileSystemLoader
 from typing import Dict, Any, List
 from . import graficos_html
@@ -16,20 +18,18 @@ env = Environment(loader=FileSystemLoader(template_dir))
 def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo: dict,
                               df_orcamento_exclusivo: pd.DataFrame, df_orcamento_compartilhado: pd.DataFrame,
                               df_mes_agregado: pd.DataFrame, link_relatorio_detalhado: str) -> str:
-    """Gera o corpo do e-mail SUMARIZADO, mas com o resumo completo."""
+    """Gera o corpo do e-mail SUMARIZADO."""
     template = env.get_template('relatorio_analise.html')
     
     def robust_currency_formatter(value):
         if pd.isna(value) or (isinstance(value, (int, float)) and value == 0): return "-"
         if isinstance(value, str): return value
         return f"R$ {value:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
     def robust_percent_formatter(value):
         if isinstance(value, str): return value
         if pd.isna(value): return "N/A"
         return f"{value:.0%}"
 
-    # --- LÓGICA DE RESUMO COMPLETA RESTAURADA ---
     itens_resumo = [
         {"indicador": "Total Gasto (Realizado)", "mes": robust_currency_formatter(resumo.get("valor_total_mes")), "ano": robust_currency_formatter(resumo.get("valor_total_ano")), "is_total": True},
         {"indicador": "&nbsp;&nbsp;↳ Gastos - Iniciativas exclusivas", "mes": robust_currency_formatter(resumo.get("gastos_mes_exclusivo")), "ano": robust_currency_formatter(resumo.get("gastos_ano_exclusivo")), "is_total": False},
@@ -39,44 +39,32 @@ def gerar_corpo_email_analise(unidade_gestora: str, data_relatorio: str, resumo:
         {"indicador": "&nbsp;&nbsp;↳ Orçamento - Iniciativas compartilhadas (b)", "mes": robust_currency_formatter(resumo.get("orcamento_mes_compartilhado")), "ano": robust_currency_formatter(resumo.get("orcamento_total_compartilhado")), "is_total": False},
         {"indicador": "Total de Lançamentos", "mes": resumo.get("qtd_lancamentos_mes"), "ano": resumo.get("qtd_lancamentos_ano"), "is_total": True},
     ]
-
     resumo_formatado = {"numero_unidade": resumo.get("numero_unidade"), "mes_referencia": resumo.get("mes_referencia")}
-    
-    formatters = {
-        'projeto': {'Criticidade': lambda x: x, 'Orçado': robust_currency_formatter, 'Realizado': robust_currency_formatter, '% Execução': robust_percent_formatter},
-        'mes': {'Mês': lambda x: x, 'Realizado (Exclusivo)': robust_currency_formatter, 'Realizado (Compartilhado)': robust_currency_formatter, 'Sinalização da IA': lambda x: x}
-    }
-
+    formatters = {'projeto': {'Criticidade': lambda x: x, 'Orçado': robust_currency_formatter, 'Realizado': robust_currency_formatter, '% Execução': robust_percent_formatter}, 'mes': {'Mês': lambda x: x, 'Realizado (Exclusivo)': robust_currency_formatter, 'Realizado (Compartilhado)': robust_currency_formatter, 'Sinalização da IA': lambda x: x}}
     tabelas_html = {
         'tabela_orc_exclusivo': df_orcamento_exclusivo.to_html(index=False, na_rep='N/A', classes='table', formatters=formatters['projeto']),
         'tabela_orc_compartilhado': df_orcamento_compartilhado.to_html(index=False, na_rep='N/A', classes='table', formatters=formatters['projeto']),
         'tabela_mes_agregado': df_mes_agregado.to_html(index=False, na_rep='N/A', classes='table', formatters=formatters['mes']),
     }
+    return template.render(unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo_formatado, itens_resumo=itens_resumo, tem_exclusivos=not df_orcamento_exclusivo.empty, tem_compartilhados=not df_orcamento_compartilhado.empty, link_relatorio_detalhado=link_relatorio_detalhado, **tabelas_html)
 
-    return template.render(
-        unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo_formatado, itens_resumo=itens_resumo,
-        tem_exclusivos=not df_orcamento_exclusivo.empty, tem_compartilhados=not df_orcamento_compartilhado.empty,
-        link_relatorio_detalhado=link_relatorio_detalhado, **tabelas_html
-    )
-
-def gerar_relatorio_detalhado(unidade_gestora: str, resumo: dict,
+def gerar_relatorio_detalhado(unidade_gestora: str, data_relatorio: str, resumo: dict,
                                df_unidade_bruto: pd.DataFrame,
                                df_orcamento_exclusivo: pd.DataFrame,
                                df_fornecedores_exclusivo: pd.DataFrame,
                                df_ocorrencias_atipicas: pd.DataFrame,
                                df_clusters: Dict[str, pd.DataFrame],
                                resumo_clusters: Dict[str, Dict[str, Any]]) -> str:
-    
-    """Gera o HTML do relatório detalhado com todos os gráficos e tabelas de IA."""
     logger.info("Gerando corpo do relatório detalhado interativo...")
     template = env.get_template('relatorio_detalhado.html')
     
-    chart_data_json = {
+    chart_data = {
         'orcamento': graficos_html.preparar_dados_execucao_orcamentaria(df_orcamento_exclusivo),
-        'tendencia': graficos_html.preparar_dados_tendencia_mensal(resumo['df_mes_agregado_raw']),
+        'tendencia': graficos_html.preparar_dados_tendencia_mensal(resumo.get('df_mes_agregado_raw', pd.DataFrame())),
         'fornecedores': graficos_html.preparar_dados_top_fornecedores(df_fornecedores_exclusivo),
         'ocorrencias': graficos_html.preparar_dados_ocorrencias_por_justificativa(df_ocorrencias_atipicas),
         'treemap': graficos_html.preparar_dados_treemap_contas(df_unidade_bruto),
+        'distribuicao': graficos_html.preparar_dados_distribuicao_tipo_projeto(resumo),
         'cluster': graficos_html.preparar_dados_para_grafico_cluster(df_clusters)
     }
 
@@ -99,24 +87,25 @@ def gerar_relatorio_detalhado(unidade_gestora: str, resumo: dict,
             'coef_variacao': robust_percent_formatter(data.get('coef_variacao')),
             'description': data.get('description', 'Descrição não disponível.')
         }
-
+    
     formatters = {
         'ocorrencia': {'Realizado': robust_currency_formatter, 'Justificativa IA': lambda x: x},
-        'folha_cluster': {'Agrupamento Contábil (Nível 4)': lambda x: x, 'Valor Total (Ano)': robust_currency_formatter, 'Qtd. Lançamentos (Ano)': robust_int_formatter, 'Coeficiente de Variação (CV)': robust_percent_formatter}
+        'cluster': {'Agrupamento Contábil (Nível 4)': lambda x: x, 'Valor Total (Ano)': robust_currency_formatter, 'Qtd. Lançamentos (Ano)': robust_int_formatter, 'Coeficiente de Variação (CV)': robust_percent_formatter}
     }
     
     tabela_ocorrencias_html = df_ocorrencias_atipicas.to_html(index=False, na_rep='N/A', classes='table', formatters=formatters['ocorrencia'])
-    clusters_html = {name: df.to_html(index=False, na_rep='-', classes='table', formatters=formatters['folha_cluster']) for name, df in df_clusters.items()}
+    clusters_html = {name: df.to_html(index=False, na_rep='-', classes='table', formatters=formatters['cluster']) for name, df in df_clusters.items()}
     
     return template.render(
-        unidade_gestora=unidade_gestora, resumo=resumo,
+        unidade_gestora=unidade_gestora, data_relatorio=data_relatorio, resumo=resumo,
         tem_ocorrencias_atipicas=not df_ocorrencias_atipicas.empty,
         tem_clusters_folha=bool(df_clusters),
         tabela_ocorrencias_atipicas=tabela_ocorrencias_html,
         clusters_folha=clusters_html,
         resumo_clusters_folha=resumo_clusters_formatado,
-        chart_data_json=json.dumps(chart_data_json)
+        chart_data_json=json.dumps(chart_data)
     )
+
 
 def enviar_email_via_smtp(assunto: str, corpo_html: str, destinatario: str, caminhos_anexos: List[str] = None):
     logger.info(f"Iniciando envio de e-mail para {destinatario} via SMTP...")

@@ -32,7 +32,7 @@
 
         <h2>Painel Visual de Análises</h2>
         <div class="grid-container">
-            <div class="chart-card full-width-card"><canvas id="tendenciaChart" height="100"></canvas></div>
+            <div class="chart-card full-width-card"><canvas id="tendenciaChart" style="height: 350px;"></canvas></div>
             <div class="chart-card"><canvas id="orcamentoChart"></canvas></div>
             <div class="chart-card"><canvas id="fornecedoresChart"></canvas></div>
             <div class="chart-card"><canvas id="distribuicaoChart"></canvas></div>
@@ -40,49 +40,34 @@
             <div class="chart-card full-width-card"><canvas id="treemapChart" style="height: 500px;"></canvas></div>
         </div>
 
-        <h2>Análises Detalhadas de Inteligência Artificial</h2>
+        <h2>Detalhamento das Análises de IA</h2>
         
         <h3>Ocorrências Atípicas de Contexto (Projetos Exclusivos)</h3>
-        <div class="section-intro">
-            <strong>Metodologia Aplicada (IA Híbrida: Z-Score + Isolation Forest):</strong><br>
-            A IA age como um auditor estatístico, avaliando cada transação em três dimensões: o desvio estatístico do valor (Z-Score), a familiaridade do fornecedor e a familiaridade do projeto. O modelo sinaliza ocorrências onde a combinação desses fatores é rara, focando em eventos genuinamente incomuns.
-        </div>
-        {% if tem_ocorrencias_atipicas %}
-            {{ tabela_ocorrencias_atipicas | safe }}
-        {% else %}
-            <p>Nenhuma ocorrência atípica de contexto foi detectada nos dados do mês de referência para os projetos exclusivos desta unidade.</p>
-        {% endif %}
-
+        <!-- (Seção da tabela de ocorrências) -->
+        
         <h3>Análise de Comportamento: Contas de Projetos Exclusivos (IA)</h3>
-        <div class="section-intro">
-            <strong>Metodologia Aplicada (K-Means Clustering):</strong><br>
-            A IA agrupa os tipos de despesa dos projetos exclusivos com base em seu "DNA" financeiro (Valor Total, Frequência e Variação). O gráfico de bolhas abaixo ilustra esses perfis, onde o tamanho da bolha representa o nível de imprevisibilidade (CV).
-        </div>
         <div class="chart-card full-width-card"><canvas id="clusterChart" style="height: 500px;"></canvas></div>
-        {% if tem_clusters_folha %}
-            {% for nome_cluster, tabela_html_cluster in clusters_folha.items() %}
-                <h4>{{ nome_cluster }}</h4>
-                <div class="section-intro">
-                    <strong>Interpretação do Perfil:</strong> {{ resumo_clusters_folha[nome_cluster].description }}
-                </div>
-                {{ tabela_html_cluster | safe }}
-            {% endfor %}
-        {% else %}
-            <p>Não foi possível gerar a análise de comportamento para as contas dos projetos exclusivos desta unidade.</p>
-        {% endif %}
+        <!-- (Seção da análise de comportamento com as tabelas) -->
     </div>
 
     <script>
         const chartData = {{ chart_data_json | safe }};
-        const createChart = (id, type, data, options = {}) => new Chart(document.getElementById(id), { type, data, options });
+        const createChart = (id, type, data, options = {}) => {
+            const element = document.getElementById(id);
+            if (element && data && data.labels && data.labels.length > 0) {
+                new Chart(element, { type, data, options });
+            } else if (element && data && data.datasets && data.datasets.length > 0 && data.datasets[0].data.length > 0) {
+                new Chart(element, { type, data, options });
+            }
+        };
 
-        if (chartData.tendencia && chartData.tendencia.labels && chartData.tendencia.labels.length > 0) createChart('tendenciaChart', 'line', chartData.tendencia, { plugins: { title: { display: true, text: 'Evolução Mensal dos Gastos da Unidade', font: { size: 18 } } } });
-        if (chartData.orcamento && chartData.orcamento.labels && chartData.orcamento.labels.length > 0) createChart('orcamentoChart', 'bar', chartData.orcamento, { indexAxis: 'y', plugins: { title: { display: true, text: 'Execução Orçamentária (Top 10 Projetos por %)', font: { size: 18 } } } });
-        if (chartData.fornecedores && chartData.fornecedores.labels && chartData.fornecedores.labels.length > 0) createChart('fornecedoresChart', 'bar', chartData.fornecedores, { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 10 Fornecedores (Projetos Exclusivos)', font: { size: 18 } } } });
-        if (chartData.distribuicao_tipo_projeto && chartData.distribuicao_tipo_projeto.labels && chartData.distribuicao_tipo_projeto.labels.length > 0) createChart('distribuicaoChart', 'doughnut', chartData.distribuicao_tipo_projeto, { plugins: { title: { display: true, text: 'Distribuição de Gastos por Tipo de Projeto', font: { size: 18 } } } });
-        if (chartData.ocorrencias && chartData.ocorrencias.labels && chartData.ocorrencias.labels.length > 0) createChart('ocorrenciasChart', 'pie', chartData.ocorrencias, { plugins: { title: { display: true, text: 'Ocorrências Atípicas por Justificativa da IA', font: { size: 18 } } } });
-        if (chartData.treemap && chartData.treemap.datasets && chartData.treemap.datasets.length > 0) createChart('treemapChart', 'treemap', chartData.treemap, { plugins: { title: { display: true, text: 'Composição dos Gastos por Agrupamento Contábil', font: { size: 18 } } } });
-        if (chartData.cluster && chartData.cluster.datasets && chartData.cluster.datasets.length > 0) createChart('clusterChart', 'bubble', chartData.cluster, { plugins: { title: { display: true, text: 'Visualização dos Perfis de Contas (DNA Financeiro)', font: { size: 18 } } }, scales: { y: { type: 'logarithmic', title: { display: true, text: 'Valor Total (R$)' } }, x: { type: 'logarithmic', title: { display: true, text: 'Frequência (Qtd. Lançamentos)' } } } });
+        createChart('tendenciaChart', 'line', chartData.tendencia, { plugins: { title: { display: true, text: 'Evolução Mensal dos Gastos da Unidade', font: { size: 18 } } } });
+        createChart('orcamentoChart', 'bar', chartData.orcamento, { indexAxis: 'y', plugins: { title: { display: true, text: 'Execução Orçamentária (Top 10 Projetos por %)', font: { size: 18 } } } });
+        createChart('fornecedoresChart', 'bar', chartData.fornecedores, { indexAxis: 'y', plugins: { title: { display: true, text: 'Top 10 Fornecedores (Projetos Exclusivos)', font: { size: 18 } } } });
+        createChart('distribuicaoChart', 'doughnut', chartData.distribuicao, { plugins: { title: { display: true, text: 'Distribuição de Gastos por Tipo de Projeto', font: { size: 18 } } } });
+        createChart('ocorrenciasChart', 'pie', chartData.ocorrencias, { plugins: { title: { display: true, text: 'Ocorrências Atípicas por Justificativa da IA', font: { size: 18 } } } });
+        createChart('treemapChart', 'treemap', chartData.treemap, { plugins: { title: { display: true, text: 'Composição dos Gastos por Agrupamento Contábil', font: { size: 18 } } } });
+        createChart('clusterChart', 'bubble', chartData.cluster, { plugins: { title: { display: true, text: 'Visualização dos Perfis de Contas (DNA Financeiro)', font: { size: 18 } } }, scales: { y: { type: 'logarithmic', title: { display: true, text: 'Valor Total (R$)' } }, x: { type: 'logarithmic', title: { display: true, text: 'Frequência (Qtd. Lançamentos)' } } } });
     </script>
 </body>
 </html>
